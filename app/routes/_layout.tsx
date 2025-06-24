@@ -1,4 +1,4 @@
-import { Outlet } from "react-router";
+import { Outlet, Link, useLocation } from "react-router";
 import { useState, useEffect } from "react";
 import {
   Button,
@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 
 export default function Layout() {
+  const location = useLocation();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -44,12 +45,13 @@ export default function Layout() {
   };
 
   const navigationItems = [
-    { icon: Home, label: "Dashboard", href: "/dashboard", active: true },
-    { icon: ShoppingCart, label: "Sales", href: "/sales" },
-    { icon: Package, label: "Inventory", href: "/inventory" },
-    { icon: Users, label: "Customers", href: "/customers" },
-    { icon: BarChart3, label: "Reports", href: "/reports" },
-    { icon: Settings, label: "Settings", href: "/settings" },
+    { icon: Home, label: "Dashboard", href: "/dashboard", active: location.pathname === "/dashboard" },
+    { icon: ShoppingCart, label: "Sales", href: "/sales", active: location.pathname === "/sales" },
+    { icon: Package, label: "Inventory", href: "/inventory", active: location.pathname === "/inventory" },
+    { icon: Users, label: "Customers", href: "/customers", active: location.pathname === "/customers" },
+    { icon: Users, label: "Users", href: "/users", active: location.pathname === "/users" },
+    { icon: BarChart3, label: "Reports", href: "/reports", active: location.pathname === "/reports" },
+    { icon: Settings, label: "Settings", href: "/settings", active: location.pathname === "/settings" },
   ];
 
   return (
@@ -126,26 +128,27 @@ export default function Layout() {
           {navigationItems.map((item, index) => {
             const IconComponent = item.icon;
             const navButton = (
-              <Button
-                key={index}
-                variant={item.active ? "solid" : "light"}
-                color={item.active ? "primary" : "default"}
-                className={`
-                  w-full h-12
-                  ${isSidebarCollapsed 
-                    ? "justify-center px-0 min-w-0" 
-                    : "justify-start px-4"
-                  }
-                  ${item.active ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300" : ""}
-                `}
-                startContent={!isSidebarCollapsed ? <IconComponent className="w-5 h-5 mr-3" /> : undefined}
-              >
-                {isSidebarCollapsed ? (
-                  <IconComponent className="w-5 h-5" />
-                ) : (
-                  <span className="text-left flex-1">{item.label}</span>
-                )}
-              </Button>
+              <Link key={index} to={item.href} className="block">
+                <Button
+                  variant={item.active ? "solid" : "light"}
+                  color={item.active ? "primary" : "default"}
+                  className={`
+                    w-full h-12
+                    ${isSidebarCollapsed 
+                      ? "justify-center px-0 min-w-0" 
+                      : "justify-start px-4"
+                    }
+                    ${item.active ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300" : ""}
+                  `}
+                  startContent={!isSidebarCollapsed ? <IconComponent className="w-5 h-5 mr-3" /> : undefined}
+                >
+                  {isSidebarCollapsed ? (
+                    <IconComponent className="w-5 h-5" />
+                  ) : (
+                    <span className="text-left flex-1">{item.label}</span>
+                  )}
+                </Button>
+              </Link>
             );
 
             return isSidebarCollapsed ? (
