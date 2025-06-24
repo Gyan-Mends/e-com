@@ -1,10 +1,13 @@
-import { Outlet, Link, useLocation } from "react-router";
+import { Outlet, Link, useLocation, useLoaderData, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import {
   Button,
-  Switch,
   Tooltip,
-  Divider,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  Avatar,
 } from "@heroui/react";
 import {
   Menu,
@@ -19,9 +22,23 @@ import {
   Moon,
   ChevronLeft,
   ChevronRight,
+  LogOut,
+  User,
 } from "lucide-react";
+import type { LoaderFunctionArgs } from "react-router";
+import { requireAuthWithUser } from "../utils/auth";
+import axios from "axios";
+import { successToast, errorToast } from "../components/toast";
+
+// Loader to check authentication and get user data
+export async function loader({ request }: LoaderFunctionArgs) {
+  const user = await requireAuthWithUser(request);
+  return { user };
+}
 
 export default function Layout() {
+  const { user } = useLoaderData() as { user: any };
+  const navigate = useNavigate();
   const location = useLocation();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -42,6 +59,19 @@ export default function Layout() {
     setIsDarkMode(newTheme);
     document.documentElement.classList.toggle("dark", newTheme);
     localStorage.setItem("theme", newTheme ? "dark" : "light");
+  };
+
+  const handleLogout = async () => {
+    try {
+      await axios.post('/api/auth/logout');
+      successToast('Logged out successfully');
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      errorToast('Error logging out');
+      // Force redirect to login even if API call fails
+      navigate('/login');
+    }
   };
 
   const navigationItems = [
@@ -202,9 +232,55 @@ export default function Layout() {
                 </Button>
               </Tooltip>
               
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Welcome back!
-              </div>
+              {/* User Dropdown */}
+              <Dropdown placement="bottom-end">
+                <DropdownTrigger>
+                  <Button
+                    variant="light"
+                    className="p-2 h-auto min-w-0"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Avatar
+                        src={user.avatar}
+                        name={user.name}
+                        size="sm"
+                        showFallback
+                      />
+                      <div className="hidden md:block text-left">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {user.name}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                          {user.role}
+                        </p>
+                      </div>
+                    </div>
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu aria-label="User menu">
+                  <DropdownItem
+                    key="profile"
+                    startContent={<User className="w-4 h-4" />}
+                    description={user.email}
+                  >
+                    My Profile
+                  </DropdownItem>
+                  <DropdownItem
+                    key="settings"
+                    startContent={<Settings className="w-4 h-4" />}
+                  >
+                    Account Settings
+                  </DropdownItem>
+                  <DropdownItem
+                    key="logout"
+                    color="danger"
+                    startContent={<LogOut className="w-4 h-4" />}
+                    onPress={handleLogout}
+                  >
+                    Sign Out
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
             </div>
           </div>
         </header>
