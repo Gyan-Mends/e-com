@@ -425,20 +425,36 @@ export default function UsersPage() {
         size="md"
       >
         <form onSubmit={handleFormSubmit} className="space-y-6">
-          {/* Image Upload Section */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          {/* Profile Picture Section */}
+          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
               Profile Picture
             </label>
-            <div className="flex items-center space-x-4">
-              <Avatar
-                src={formData.avatar}
-                name={formData.name}
-                size="lg"
-                className="w-20 h-20"
-                showFallback
-              />
-              <div className="flex-1">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="relative">
+                <Avatar
+                  src={formData.avatar}
+                  name={formData.name || "User"}
+                  size="lg"
+                  className="w-24 h-24 ring-4 ring-white dark:ring-gray-700 shadow-lg"
+                  showFallback
+                />
+                {formData.avatar && (
+                  <Button
+                    type="button"
+                    isIconOnly
+                    size="sm"
+                    color="danger"
+                    variant="solid"
+                    className="absolute -top-2 -right-2 min-w-6 h-6 rounded-full"
+                    onPress={removeImage}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                )}
+              </div>
+              
+              <div className="text-center">
                 <input
                   type="file"
                   accept="image/*"
@@ -446,107 +462,140 @@ export default function UsersPage() {
                   className="hidden"
                   id="avatar-upload"
                 />
-                <div className="flex space-x-2">
-                  <Button
-                    type="button"
-                    variant="bordered"
-                    size="sm"
-                    startContent={<Upload className="w-4 h-4" />}
-                    onPress={() => document.getElementById('avatar-upload')?.click()}
-                  >
-                    Upload Image
-                  </Button>
-                  {formData.avatar && (
-                    <Button
-                      type="button"
-                      variant="light"
-                      size="sm"
-                      color="danger"
-                      startContent={<X className="w-4 h-4" />}
-                      onPress={removeImage}
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
+                <Button
+                  type="button"
+                  variant="bordered"
+                  size="sm"
+                  startContent={<Upload className="w-4 h-4" />}
+                  onPress={() => document.getElementById('avatar-upload')?.click()}
+                  className="mb-2"
+                >
+                  {formData.avatar ? "Change Image" : "Upload Image"}
+                </Button>
+                <p className="text-xs text-gray-500">
+                  JPG, PNG or GIF (max 2MB)
+                </p>
                 {errors.avatar && (
                   <p className="text-sm text-red-500 mt-1">{errors.avatar}</p>
                 )}
-                <p className="text-xs text-gray-500 mt-1">
-                  JPG, PNG or GIF (max 2MB)
+              </div>
+            </div>
+          </div>
+
+          {/* Personal Information */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">
+              Personal Information
+            </h3>
+            
+            <div className="grid grid-cols-1 gap-4">
+              <CustomInput
+                label="Full Name"
+                placeholder="Enter full name"
+                value={formData.name}
+                onChange={(value) => setFormData(prev => ({ ...prev, name: value }))}
+                error={errors.name}
+                required
+              />
+
+              <CustomInput
+                label="Email Address"
+                type="email"
+                placeholder="Enter email address"
+                value={formData.email}
+                onChange={(value) => setFormData(prev => ({ ...prev, email: value }))}
+                error={errors.email}
+                required
+              />
+
+              <CustomInput
+                label="Phone Number"
+                placeholder="+1 (555) 123-4567"
+                value={formData.phone}
+                onChange={(value) => setFormData(prev => ({ ...prev, phone: value }))}
+              />
+            </div>
+          </div>
+
+          {/* Account Settings */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">
+              Account Settings
+            </h3>
+            
+            <div className="grid grid-cols-1 gap-4">
+              <CustomInput
+                label={isEditing ? "New Password (leave empty to keep current)" : "Password"}
+                type="password"
+                placeholder="Enter password (minimum 6 characters)"
+                value={formData.password}
+                onChange={(value) => setFormData(prev => ({ ...prev, password: value }))}
+                error={errors.password}
+                required={!isEditing}
+              />
+
+              <div className="space-y-2">
+                <Select
+                  label="Role"
+                  placeholder="Select user role"
+                  selectedKeys={[formData.role]}
+                  onSelectionChange={(keys) => {
+                    const role = Array.from(keys)[0] as "admin" | "seller";
+                    setFormData(prev => ({ ...prev, role }));
+                  }}
+                  variant="bordered"
+                  classNames={{
+                    label: "font-nunito text-sm !text-black dark:!text-white",
+                    trigger: "border border-black/20 dark:border-white/20 bg-white dark:bg-gray-800"
+                  }}
+                >
+                  <SelectItem key="seller" textValue="Seller">
+                    <div className="flex items-center space-x-2">
+                      <User className="w-4 h-4" />
+                      <span>Seller</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem key="admin" textValue="Administrator">
+                    <div className="flex items-center space-x-2">
+                      <Shield className="w-4 h-4" />
+                      <span>Administrator</span>
+                    </div>
+                  </SelectItem>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  {formData.role === 'admin' 
+                    ? 'Full access to all system features and settings' 
+                    : 'Limited access to sales and customer management'
+                  }
                 </p>
               </div>
             </div>
           </div>
 
-          <CustomInput
-            label="Full Name"
-            placeholder="Enter full name"
-            value={formData.name}
-            onChange={(value) => setFormData(prev => ({ ...prev, name: value }))}
-            error={errors.name}
-            required
-          />
-
-          <CustomInput
-            label="Email Address"
-            type="email"
-            placeholder="Enter email address"
-            value={formData.email}
-            onChange={(value) => setFormData(prev => ({ ...prev, email: value }))}
-            error={errors.email}
-            required
-          />
-
-          <CustomInput
-            label={isEditing ? "New Password (leave empty to keep current)" : "Password"}
-            type="password"
-            placeholder="Enter password"
-            value={formData.password}
-            onChange={(value) => setFormData(prev => ({ ...prev, password: value }))}
-            error={errors.password}
-            required={!isEditing}
-          />
-
-          <Select
-            label="Role"
-            placeholder="Select role"
-            selectedKeys={[formData.role]}
-            onSelectionChange={(keys) => {
-              const role = Array.from(keys)[0] as "admin" | "seller";
-              setFormData(prev => ({ ...prev, role }));
-            }}
-            variant="bordered"
-            classNames={{
-              label: "font-nunito text-sm !text-black dark:!text-white",
-              trigger: "border border-black/20 dark:border-white/20 bg-white dark:bg-gray-800"
-            }}
-          >
-            <SelectItem key="seller">Seller</SelectItem>
-            <SelectItem key="admin">Administrator</SelectItem>
-          </Select>
-
-          <CustomInput
-            label="Phone Number"
-            placeholder="Enter phone number"
-            value={formData.phone}
-            onChange={(value) => setFormData(prev => ({ ...prev, phone: value }))}
-          />
-
-          <CustomInput
-            label="Address"
-            type="textarea"
-            placeholder="Enter address"
-            value={formData.address}
-            onChange={(value) => setFormData(prev => ({ ...prev, address: value }))}
-            rows={3}
-          />
+          {/* Additional Information */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">
+              Additional Information
+            </h3>
+            
+            <CustomInput
+              label="Address"
+              type="textarea"
+              placeholder="Enter full address"
+              value={formData.address}
+              onChange={(value) => setFormData(prev => ({ ...prev, address: value }))}
+              rows={3}
+            />
+          </div>
 
           {errors.general && (
-            <div className="text-red-500 text-sm">{errors.general}</div>
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+              <p className="text-red-700 dark:text-red-400 text-sm">{errors.general}</p>
+            </div>
           )}
 
-          <div className="flex justify-end space-x-3 pt-4">
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
             <Button
               type="button"
               variant="light"
@@ -559,6 +608,7 @@ export default function UsersPage() {
               type="submit"
               color="primary"
               isLoading={isLoading}
+              startContent={isEditing ? <Edit className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
             >
               {isEditing ? "Update User" : "Create User"}
             </Button>

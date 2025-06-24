@@ -211,7 +211,7 @@ export default function Layout() {
 
         {/* Page Content */}
         <main className="p-6">
-          <Outlet />
+      <Outlet />
         </main>
       </div>
     </div>
