@@ -61,49 +61,50 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-10">
         {/* Header */}
-        <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mb-4">
-            <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">POS</span>
-            </div>
+        <div className="text-center space-y-6">
+         
+          <div className="space-y-3">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+              Welcome Back
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 text-base">
+              Sign in to your Point of Sale account
+            </p>
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Welcome Back
-          </h2>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Sign in to your Point of Sale account
-          </p>
         </div>
 
         {/* Login Form */}
-        <Card className="shadow-lg">
-          <CardHeader className="pb-4">
-            <div className="flex items-center space-x-2">
-              <Lock className="w-5 h-5 text-primary-600" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <Card className="shadow-xl ring-1 ring-black/5 dark:ring-white/10 border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+          <CardHeader className="pb-6 pt-8 px-8">
+            <div className="flex items-center justify-center space-x-3">
+              <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                <Lock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                 Sign In
               </h3>
             </div>
           </CardHeader>
-          <CardBody className="pt-0">
-            <form onSubmit={handleSubmit} className="space-y-6">
+          <CardBody className="pt-0 px-8 pb-8">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               {/* Email Input */}
-              <CustomInput
-                label="Email Address"
-                type="email"
-                placeholder="Enter your email"
-                value={formData.email}
-                onChange={(value) => setFormData(prev => ({ ...prev, email: value }))}
-                error={errors.email}
-                required
-                startContent={<Mail className="w-4 h-4 text-gray-400" />}
-              />
+              <div className="space-y-2">
+                <CustomInput
+                  label="Email Address"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={formData.email}
+                  onChange={(value) => setFormData(prev => ({ ...prev, email: value }))}
+                  error={errors.email}
+                  required
+                />
+              </div>
 
               {/* Password Input */}
-              <div className="relative">
+              <div className="space-y-2 ">
                 <CustomInput
                   label="Password"
                   type={showPassword ? "text" : "password"}
@@ -112,12 +113,11 @@ export default function LoginPage() {
                   onChange={(value) => setFormData(prev => ({ ...prev, password: value }))}
                   error={errors.password}
                   required
-                  startContent={<Lock className="w-4 h-4 text-gray-400" />}
                   endContent={
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200 p-1 rounded"
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -125,21 +125,22 @@ export default function LoginPage() {
                 />
               </div>
 
-              {/* Remember Me */}
-              <div className="flex items-center justify-between">
+              {/* Remember Me and Forgot Password */}
+              <div className="flex items-center justify-between pt-2">
                 <Checkbox
                   isSelected={formData.rememberMe}
                   onValueChange={(checked) => setFormData(prev => ({ ...prev, rememberMe: checked }))}
                   size="sm"
+                  classNames={{
+                    label: "text-sm text-gray-600 dark:text-gray-400"
+                  }}
                 >
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Keep me signed in
-                  </span>
+                  Keep me signed in
                 </Checkbox>
                 
                 <button
                   type="button"
-                  className="text-sm text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
+                  className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors duration-200"
                   onClick={() => {
                     // TODO: Implement forgot password
                     errorToast('Forgot password feature coming soon!');
@@ -151,33 +152,35 @@ export default function LoginPage() {
 
               {/* General Error */}
               {errors.general && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-                  <p className="text-red-700 dark:text-red-400 text-sm">{errors.general}</p>
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mt-4">
+                  <p className="text-red-700 dark:text-red-400 text-sm font-medium">{errors.general}</p>
                 </div>
               )}
 
               {/* Submit Button */}
-              <Button
-                type="submit"
-                color="primary"
-                size="lg"
-                className="w-full"
-                isLoading={isLoading}
-                startContent={!isLoading && <LogIn className="w-4 h-4" />}
-              >
-                {isLoading ? "Signing In..." : "Sign In"}
-              </Button>
+              <div className="pt-4">
+                <Button
+                  type="submit"
+                  color="primary"
+                  size="lg"
+                  className="w-full h-12 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                  isLoading={isLoading}
+                  startContent={!isLoading && <LogIn className="w-5 h-5" />}
+                >
+                  {isLoading ? "Signing In..." : "Sign In"}
+                </Button>
+              </div>
             </form>
           </CardBody>
         </Card>
 
         {/* Footer */}
-        <div className="text-center">
+        <div className="text-center pb-8">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Don't have an account?{" "}
             <button
               type="button"
-              className="text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
+              className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors duration-200"
               onClick={() => {
                 // TODO: Implement registration or contact admin
                 errorToast('Please contact your administrator to create an account.');
