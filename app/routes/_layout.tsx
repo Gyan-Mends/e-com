@@ -1,295 +1,598 @@
-import { Outlet, Link, useLocation, useLoaderData, useNavigate } from "react-router";
+import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import {
+  Navbar,
+  NavbarBrand,
+  NavbarContent,
+  NavbarItem,
+  NavbarMenuToggle,
+  NavbarMenu,
+  NavbarMenuItem,
   Button,
-  Tooltip,
+  Input,
+  Badge,
+  Avatar,
   Dropdown,
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
-  Avatar,
+  Card,
+  CardBody,
+  Divider,
 } from "@heroui/react";
 import {
-  Menu,
-  X,
-  Home,
+  Search,
   ShoppingCart,
-  Package,
-  Users,
-  BarChart3,
-  Settings,
-  Sun,
-  Moon,
-  ChevronLeft,
-  ChevronRight,
-  LogOut,
   User,
+  Heart,
+  Menu,
+  Home,
+  Package,
+  Tag,
+  Phone,
+  Mail,
+  MapPin,
+  LogOut,
+  Settings,
+  History,
+  Moon,
+  Sun,
+  Wallet,
 } from "lucide-react";
-import type { LoaderFunctionArgs } from "react-router";
-import { requireAuthWithUser } from "../utils/auth";
-import axios from "axios";
-import { successToast, errorToast } from "../components/toast";
-
-// Loader to check authentication and get user data
-export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await requireAuthWithUser(request);
-  return { user };
-}
+import { cartAPI, wishlistAPI } from "~/utils/api";
+import { getSessionId } from "~/utils/api";
 
 export default function Layout() {
-  const { user } = useLoaderData() as { user: any };
-  const navigate = useNavigate();
+  // Check for user authentication
+  const [user, setUser] = useState<any>(null);
+  
+  useEffect(() => {
+    // Check if user is logged in
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
+  }, []);
   const location = useLocation();
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [cartItems, setCartItems] = useState(0);
+  const [wishlistItems, setWishlistItems] = useState(0);
+  const [isDarkMode, setIsDarkMode] = useState(true); // Default to dark mode
 
-  // Initialize theme from localStorage or system preference
+  // Load cart and wishlist counts
+  useEffect(() => {
+    const loadCounts = async () => {
+      try {
+        const sessionId = getSessionId();
+        
+        // Load cart count
+        const cartResponse = await cartAPI.getCart(undefined, sessionId) as any;
+        if (cartResponse?.success && cartResponse.data) {
+          setCartItems(cartResponse.data.totalItems || 0);
+        }
+        
+        // Load wishlist count
+        const wishlistResponse = await wishlistAPI.getWishlist(undefined, sessionId) as any;
+        if (wishlistResponse?.success && wishlistResponse.data) {
+          setWishlistItems(wishlistResponse.data.length || 0);
+        }
+      } catch (error) {
+        console.error('Error loading counts:', error);
+      }
+    };
+
+    loadCounts();
+    
+    // Refresh counts every 30 seconds
+    const interval = setInterval(loadCounts, 30000);
+    
+    return () => clearInterval(interval);
+  }, [location.pathname]); // Reload counts when navigating
+
+  // Dark mode toggle effect - default to dark mode
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
-    const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const shouldBeDark = savedTheme === "dark" || (!savedTheme && systemDark);
-    
-    setIsDarkMode(shouldBeDark);
-    document.documentElement.classList.toggle("dark", shouldBeDark);
+    if (savedTheme === "light") {
+      setIsDarkMode(false);
+      document.documentElement.classList.remove("dark");
+    } else {
+      // Default to dark mode if no saved theme or theme is dark
+      setIsDarkMode(true);
+      document.documentElement.classList.add("dark");
+      if (!savedTheme) {
+        localStorage.setItem("theme", "dark");
+      }
+    }
   }, []);
 
   const toggleTheme = () => {
     const newTheme = !isDarkMode;
     setIsDarkMode(newTheme);
-    document.documentElement.classList.toggle("dark", newTheme);
-    localStorage.setItem("theme", newTheme ? "dark" : "light");
-  };
-
-  const handleLogout = async () => {
-    try {
-      await axios.post('/api/auth/logout');
-      successToast('Logged out successfully');
-      navigate('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-      errorToast('Error logging out');
-      // Force redirect to login even if API call fails
-      navigate('/login');
+    if (newTheme) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
     }
   };
 
-  const navigationItems = [
-    { icon: Home, label: "Dashboard", href: "/dashboard", active: location.pathname === "/dashboard" },
-    { icon: ShoppingCart, label: "Sales", href: "/sales", active: location.pathname === "/sales" },
-    { icon: Package, label: "Inventory", href: "/inventory", active: location.pathname === "/inventory" },
-    { icon: Users, label: "Customers", href: "/customers", active: location.pathname === "/customers" },
-    { icon: Users, label: "Users", href: "/users", active: location.pathname === "/users" },
-    { icon: BarChart3, label: "Reports", href: "/reports", active: location.pathname === "/reports" },
-    { icon: Settings, label: "Settings", href: "/settings", active: location.pathname === "/settings" },
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  const handleLogout = () => {
+    // Clear user data and navigate to login
+    localStorage.removeItem("user");
+    setUser(null);
+    navigate("/login");
+  };
+
+  const navigationItems: Array<{
+    name: string;
+    href: string;
+    icon: React.ComponentType<any>;
+  }> = [
+    // Navigation items can be added here if needed
+    // Example: { name: "Home", href: "/", icon: Home }
   ];
 
+  const isActive = (path: string) => {
+    return location.pathname === path;
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      {/* Mobile Menu Overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={`
-          fixed top-0 left-0 z-50 h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-lg
-          transition-all duration-300 ease-in-out
-          ${isSidebarCollapsed ? "w-16" : "w-64"}
-          ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-        `}
+    <div className="min-h-screen flex flex-col  font-sans">
+      {/* Header */}
+      <Navbar
+        isMenuOpen={isMenuOpen}
+        onMenuOpenChange={setIsMenuOpen}
+        className=""
+        maxWidth="full"
       >
-        {/* Sidebar Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          {isSidebarCollapsed ? (
-            // Collapsed: Show only logo centered
-            <div className="flex items-center justify-center w-full">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <ShoppingCart className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          ) : (
-            // Expanded: Show logo + title
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <ShoppingCart className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-gray-800 dark:text-white">
-                POS System
-              </span>
-            </div>
-          )}
-          
-          {/* Mobile Close Button */}
-          <Button
-            isIconOnly
-            variant="light"
-            size="sm"
-            className="lg:hidden"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            <X className="w-5 h-5" />
-          </Button>
-
-          {/* Desktop Collapse/Expand Button */}
-          <Tooltip content={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}>
-            <Button
-              isIconOnly
-              variant="light"
-              size="sm"
-              className="hidden lg:flex"
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        {/* Brand */}
+        <NavbarContent>
+          <NavbarMenuToggle
+            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+            className="sm:hidden"
+          />
+          <NavbarBrand>
+            <Link
+              to="/"
+              className="font-bold text-2xl text-primary font-heading"
             >
-              {isSidebarCollapsed ? (
-                <ChevronRight className="w-4 h-4" />
-              ) : (
-                <ChevronLeft className="w-4 h-4" />
-              )}
-            </Button>
-          </Tooltip>
-        </div>
+              Bestway
+            </Link>
+          </NavbarBrand>
+        </NavbarContent>
 
-        {/* Navigation Menu */}
-        <nav className="flex-1 px-2 py-4 space-y-2">
-          {navigationItems.map((item, index) => {
-            const IconComponent = item.icon;
-            const navButton = (
-              <Link key={index} to={item.href} className="block">
-                <Button
-                  variant={item.active ? "solid" : "light"}
-                  color={item.active ? "primary" : "default"}
-                  className={`
-                    w-full h-12
-                    ${isSidebarCollapsed 
-                      ? "justify-center px-0 min-w-0" 
-                      : "justify-start px-4"
-                    }
-                    ${item.active ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300" : ""}
-                  `}
-                  startContent={!isSidebarCollapsed ? <IconComponent className="w-5 h-5 mr-3" /> : undefined}
-                >
-                  {isSidebarCollapsed ? (
-                    <IconComponent className="w-5 h-5" />
-                  ) : (
-                    <span className="text-left flex-1">{item.label}</span>
-                  )}
-                </Button>
+        {/* Desktop Navigation */}
+        <NavbarContent className="hidden sm:flex gap-8" justify="center">
+          {navigationItems.map((item) => (
+            <NavbarItem key={item.name}>
+              <Link
+                to={item.href}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                  isActive(item.href)
+                    ? "text-primary bg-primary/10"
+                    : "text-gray-600 dark:text-gray-300 hover:text-primary hover:bg-primary/5"
+                }`}
+              >
+                <item.icon size={18} />
+                {item.name}
               </Link>
-            );
+            </NavbarItem>
+          ))}
+        </NavbarContent>
 
-            return isSidebarCollapsed ? (
-              <Tooltip key={index} content={item.label} placement="right">
-                {navButton}
-              </Tooltip>
-            ) : (
-              navButton
-            );
-          })}
-        </nav>
-      </aside>
+        {/* Right Side Actions */}
+        <NavbarContent justify="end">
+          {/* Search */}
+          <NavbarItem className="hidden md:flex">
+            <form onSubmit={handleSearch} className="flex">
+              <Input
+                type="search"
+                placeholder="Search products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                startContent={<Search size={18} />}
+                className="w-64"
+                radius="lg"
+              />
+            </form>
+          </NavbarItem>
 
-      {/* Main Content */}
-      <div className={`
-        transition-all duration-300 ease-in-out
-        ${isSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"}
-      `}>
-        {/* Top Header */}
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-          <div className="flex items-center justify-between">
-            {/* Mobile Menu Button */}
+          {/* Theme Toggle */}
+          <NavbarItem>
             <Button
               isIconOnly
               variant="light"
-              size="sm"
-              className="lg:hidden"
-              onClick={() => setIsMobileMenuOpen(true)}
+              onClick={toggleTheme}
+              className="text-gray-600 dark:text-gray-300 hover:text-primary"
+              aria-label="Toggle theme"
             >
-              <Menu className="w-6 h-6" />
+              {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
             </Button>
+          </NavbarItem>
 
-            {/* Page Title */}
-            <div className="flex-1 lg:flex-none">
-              <h1 className="text-2xl font-bold text-gray-800 dark:text-white ml-4 lg:ml-0">
-                Point of Sale System
-              </h1>
-            </div>
+          {/* Wishlist */}
+          <NavbarItem>
+            <Badge content={wishlistItems} color="danger" showOutline={false} isInvisible={wishlistItems === 0}>
+              <Button
+                as={Link}
+                to="/wishlist"
+                isIconOnly
+                variant="light"
+                className="text-gray-600 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400"
+              >
+                <Heart size={20} />
+              </Button>
+            </Badge>
+          </NavbarItem>
 
-            {/* Header Actions */}
-            <div className="flex items-center space-x-4">
-              {/* Theme Toggle */}
-              <Tooltip content={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}>
-                <Button
-                  isIconOnly
-                  variant="light"
-                  onClick={toggleTheme}
-                  size="sm"
-                >
-                  {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                </Button>
-              </Tooltip>
-              
-              {/* User Dropdown */}
+          {/* Shopping Cart */}
+          <NavbarItem>
+            <Badge content={cartItems} color="primary" showOutline={false} isInvisible={cartItems === 0}>
+              <Button
+                as={Link}
+                to="/cart"
+                isIconOnly
+                variant="light"
+                className="text-gray-600 dark:text-gray-300 hover:text-primary"
+              >
+                <ShoppingCart size={20} />
+              </Button>
+            </Badge>
+          </NavbarItem>
+
+          {/* User Menu */}
+          <NavbarItem>
+            {user ? (
               <Dropdown placement="bottom-end">
                 <DropdownTrigger>
-                  <Button
-                    variant="light"
-                    className="p-2 h-auto min-w-0"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <Avatar
-                        src={user.avatar}
-                        name={user.name}
-                        size="sm"
-                        showFallback
-                      />
-                      <div className="hidden md:block text-left">
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {user.name}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                          {user.role}
-                        </p>
-                      </div>
-                    </div>
-                  </Button>
+                  <Avatar
+                    as="button"
+                    className="transition-transform"
+                    size="sm"
+                    name={user.name || user.email}
+                    showFallback
+                  />
                 </DropdownTrigger>
-                <DropdownMenu aria-label="User menu">
-                  <DropdownItem
-                    key="profile"
-                    startContent={<User className="w-4 h-4" />}
-                    description={user.email}
-                  >
+                <DropdownMenu
+                  aria-label="Profile Actions"
+                  variant="flat"
+                  onAction={(key) => {
+                    if (key === "logout") {
+                      handleLogout();
+                    } else {
+                      navigate(`/${key}`);
+                    }
+                  }}
+                >
+                  <DropdownItem key="dashboard" startContent={<User size={16} />}>
+                    Dashboard
+                  </DropdownItem>
+                  <DropdownItem key="profile" startContent={<User size={16} />}>
                     My Profile
                   </DropdownItem>
                   <DropdownItem
-                    key="settings"
-                    startContent={<Settings className="w-4 h-4" />}
+                    key="orders"
+                    startContent={<History size={16} />}
                   >
-                    Account Settings
+                    Order History
+                  </DropdownItem>
+                  <DropdownItem
+                    key="order-tracking"
+                    startContent={<Package size={16} />}
+                  >
+                    Track Orders
+                  </DropdownItem>
+                  <DropdownItem
+                    key="wallet"
+                    startContent={<Wallet size={16} />}
+                  >
+                    Wallet
+                  </DropdownItem>
+                  <DropdownItem
+                    key="settings"
+                    startContent={<Settings size={16} />}
+                  >
+                    Settings
                   </DropdownItem>
                   <DropdownItem
                     key="logout"
                     color="danger"
-                    startContent={<LogOut className="w-4 h-4" />}
-                    onPress={handleLogout}
+                    startContent={<LogOut size={16} />}
                   >
-                    Sign Out
+                    Log Out
                   </DropdownItem>
                 </DropdownMenu>
               </Dropdown>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  as={Link}
+                  to="/login"
+                  variant="ghost"
+                  size="sm"
+                  className="font-medium"
+                >
+                  Sign In
+                </Button>
+                <Button
+                  as={Link}
+                  to="/signup"
+                  color="primary"
+                  size="sm"
+                  className="font-medium"
+                >
+                  Sign Up
+                </Button>
+              </div>
+            )}
+          </NavbarItem>
+        </NavbarContent>
+
+        {/* Mobile Menu */}
+        <NavbarMenu>
+          {/* Mobile Search */}
+          <NavbarMenuItem>
+            <form onSubmit={handleSearch} className="w-full mb-4">
+              <Input
+                type="search"
+                placeholder="Search products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                startContent={<Search size={18} />}
+                radius="lg"
+              />
+            </form>
+          </NavbarMenuItem>
+
+          {/* Mobile Navigation Items */}
+          {navigationItems.map((item) => (
+            <NavbarMenuItem key={item.name}>
+              <Link
+                to={item.href}
+                className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg transition-colors ${
+                  isActive(item.href)
+                    ? "text-primary bg-primary/10"
+                    : "text-gray-600 dark:text-gray-300 hover:text-primary hover:bg-primary/5"
+                }`}
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <item.icon size={20} />
+                {item.name}
+              </Link>
+            </NavbarMenuItem>
+          ))}
+
+          <Divider className="my-4 bg-gray-200 dark:bg-white/20" />
+
+          {/* Mobile User Actions */}
+          {user ? (
+            <>
+              <NavbarMenuItem>
+                <Link
+                  to="/dashboard"
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:text-primary hover:bg-primary/5"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <User size={20} />
+                  Dashboard
+                </Link>
+              </NavbarMenuItem>
+              <NavbarMenuItem>
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:text-primary hover:bg-primary/5"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <User size={20} />
+                  My Profile
+                </Link>
+              </NavbarMenuItem>
+              <NavbarMenuItem>
+                <Link
+                  to="/orders"
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:text-primary hover:bg-primary/5"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <History size={20} />
+                  Order History
+                </Link>
+              </NavbarMenuItem>
+              <NavbarMenuItem>
+                <Link
+                  to="/order-tracking"
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:text-primary hover:bg-primary/5"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Package size={20} />
+                  Track Orders
+                </Link>
+              </NavbarMenuItem>
+              <NavbarMenuItem>
+                <Link
+                  to="/wallet"
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:text-primary hover:bg-primary/5"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Wallet size={20} />
+                  Wallet
+                </Link>
+              </NavbarMenuItem>
+              <NavbarMenuItem>
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-red-600 hover:bg-red-50"
+                >
+                  <LogOut size={20} />
+                  Log Out
+                </button>
+              </NavbarMenuItem>
+            </>
+          ) : (
+            <>
+              <NavbarMenuItem>
+                <Link
+                  to="/login"
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:text-primary hover:bg-primary/5"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <User size={20} />
+                  Sign In
+                </Link>
+              </NavbarMenuItem>
+              <NavbarMenuItem>
+                <Link
+                  to="/signup"
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-primary dark:text-primary hover:bg-primary/5"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <User size={20} />
+                  Sign Up
+                </Link>
+              </NavbarMenuItem>
+            </>
+          )}
+        </NavbarMenu>
+      </Navbar>
+
+      {/* Main Content */}
+      <main className="flex-1">
+        <Outlet />
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 dark:bg-black text-white border-t border-gray-800 dark:border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            {/* Brand & Description */}
+            <div className="col-span-1 md:col-span-2">
+              <h3 className="text-2xl font-bold mb-4 font-heading">ShopHub</h3>
+              <p className="text-gray-300 mb-6 max-w-md">
+                Your one-stop destination for quality products at great prices.
+                Shop with confidence and enjoy fast, reliable delivery.
+              </p>
+              <div className="flex space-x-4">
+                <Button
+                  as="a"
+                  href="mailto:support@shophub.com"
+                  variant="light"
+                  startContent={<Mail size={16} />}
+                  className="text-gray-300 hover:text-white"
+                >
+                  support@shophub.com
+                </Button>
+              </div>
+            </div>
+
+            {/* Quick Links */}
+            <div>
+              <h4 className="text-lg font-semibold mb-4 font-heading">
+                Quick Links
+              </h4>
+              <ul className="space-y-2">
+                <li>
+                  <Link
+                    to="/about"
+                    className="text-gray-300 hover:text-white transition-colors"
+                  >
+                    About Us
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/contact"
+                    className="text-gray-300 hover:text-white transition-colors"
+                  >
+                    Contact
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/shipping"
+                    className="text-gray-300 hover:text-white transition-colors"
+                  >
+                    Shipping Info
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/returns"
+                    className="text-gray-300 hover:text-white transition-colors"
+                  >
+                    Returns
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Customer Service */}
+            <div>
+              <h4 className="text-lg font-semibold mb-4 font-heading">
+                Customer Service
+              </h4>
+              <ul className="space-y-2">
+                <li>
+                  <Link
+                    to="/faq"
+                    className="text-gray-300 hover:text-white transition-colors"
+                  >
+                    FAQ
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/support"
+                    className="text-gray-300 hover:text-white transition-colors"
+                  >
+                    Support Center
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/privacy"
+                    className="text-gray-300 hover:text-white transition-colors"
+                  >
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/terms"
+                    className="text-gray-300 hover:text-white transition-colors"
+                  >
+                    Terms of Service
+                  </Link>
+                </li>
+              </ul>
             </div>
           </div>
-        </header>
 
-        {/* Page Content */}
-        <main className="p-6">
-      <Outlet />
-        </main>
-      </div>
+          <Divider className="my-8 bg-gray-700 dark:bg-white/20" />
+
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <p className="text-gray-400 text-sm">
+              © 2024 ShopHub. All rights reserved.
+            </p>
+            <div className="flex items-center gap-4 mt-4 md:mt-0">
+              <span className="text-gray-400 text-sm">
+                Powered by POS System
+              </span>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
