@@ -109,7 +109,7 @@ const ProductDetailPage = () => {
   const categoryList = categories.success ? categories.data : [];
   const productData = product.success ? product.data : null;
   const relatedProductsList = relatedProducts.success
-    ? relatedProducts.data
+    ? relatedProducts.data.filter(product => product.stockQuantity > 0)
     : [];
 
   // Add to cart functionality

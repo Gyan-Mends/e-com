@@ -169,6 +169,11 @@ export const cartAPI = {
     })
 };
 
+// Tax Configuration API - consume POS system store settings
+export const taxAPI = {
+  getTaxConfiguration: () => apiRequest.get('/api/store'),
+};
+
 // Customer Authentication API - consume POS system endpoints
 export const authAPI = {
   login: async (email: string, password: string, rememberMe: boolean = false) => {

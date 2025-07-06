@@ -124,6 +124,9 @@ const Home = () => {
         product.price >= priceRange[0] && product.price <= priceRange[1]
     );
 
+    // Filter out products with zero stock quantity
+    filtered = filtered.filter((product) => product.stockQuantity > 0);
+
     // Sort products
     if (sortBy === "Top rated") {
       // Sort by stock quantity as a proxy for popularity

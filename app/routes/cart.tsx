@@ -28,6 +28,7 @@ import {
 import { 
   cartAPI,
   wishlistAPI,
+  taxAPI,
   type Cart,
   type CartItem,
   type APIResponse,
@@ -46,6 +47,17 @@ const CartPage = () => {
   const [isClearingCart, setIsClearingCart] = useState(false);
   const [message, setMessage] = useState<string>('');
   const [isMovingToWishlist, setIsMovingToWishlist] = useState<Set<string>>(new Set());
+  const [taxConfig, setTaxConfig] = useState<{
+    enabled: boolean;
+    rate: number;
+    type: 'percentage' | 'fixed';
+    name: string;
+  }>({
+    enabled: false,
+    rate: 0,
+    type: 'percentage',
+    name: 'Tax'
+  });
 
   // Load cart data on component mount
   useEffect(() => {
@@ -73,13 +85,53 @@ const CartPage = () => {
       }
     };
 
+    const loadTaxConfiguration = async () => {
+      try {
+        console.log('💰 Loading tax configuration from POS system (Cart)');
+        const response = await taxAPI.getTaxConfiguration() as any;
+        console.log('💰 Tax configuration response (Cart):', response);
+        
+        if (response?.success && response.data?.taxSettings) {
+          const taxSettings = response.data.taxSettings;
+          setTaxConfig({
+            enabled: taxSettings.rate > 0,
+            rate: taxSettings.rate,
+            type: taxSettings.type || 'percentage',
+            name: taxSettings.name || 'Tax'
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error loading tax configuration:', error);
+        // Use default tax configuration on error
+        setTaxConfig({
+          enabled: false,
+          rate: 0,
+          type: 'percentage',
+          name: 'Tax'
+        });
+      }
+    };
+
     loadCart();
+    loadTaxConfiguration();
   }, []);
 
   // Calculate totals
   const subtotal = cart?.totalAmount || 0;
   const shipping = subtotal > 50 ? 0 : 9.99; // Free shipping over $50
-  const tax = subtotal * 0.08; // 8% tax
+  
+  // Calculate tax based on POS system configuration
+  const calculateTax = () => {
+    if (!taxConfig.enabled) return 0;
+    
+    if (taxConfig.type === 'fixed') {
+      return taxConfig.rate;
+    } else {
+      return subtotal * taxConfig.rate;
+    }
+  };
+  
+  const tax = calculateTax();
   const total = subtotal + shipping + tax;
 
   // Update cart item quantity
@@ -458,14 +510,17 @@ const CartPage = () => {
                       </span>
                     </div>
                     
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        Tax
-                      </span>
-                      <span className="font-medium">
-                        {formatPrice(tax)}
-                      </span>
-                    </div>
+                    {taxConfig.enabled && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          {taxConfig.name}
+                          {taxConfig.type === 'percentage' && ` (${(taxConfig.rate * 100).toFixed(1)}%)`}
+                        </span>
+                        <span className="font-medium">
+                          {formatPrice(tax)}
+                        </span>
+                      </div>
+                    )}
                     
                     <Divider />
                     
