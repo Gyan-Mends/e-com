@@ -233,273 +233,285 @@ const Home = () => {
   }
 
   return (
-    <div className="min-h-screen customed-dark-bg">
-      {/* Header Section */}
+    <div className="h-screen customed-dark-bg flex">
+      {/* Sticky Sidebar */}
+      <div
+      style={{
+        scrollBehavior: 'smooth',
+        overflowY: 'scroll',
+        scrollbarWidth: 'thin',
+        scrollbarColor: 'transparent transparent',
+        scrollbarGutter: 'stable',
+      }}
+        className={`w-80  border-r border-gray-200 dark:border-gray-700 flex-shrink-0  ${
+          showFilters ? "block" : "hidden md:block"
+        }`}
+      >
+        <div className="p-6 h-full overflow-y-auto">
+          <div className="flex flex-col gap-8">
+            <div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">Browse Your Favourite Products By Filtering</p>
+            </div>
 
-      <div className="mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex gap-8">
-          {/* Sidebar Filters */}
-          <div
-            className={`w-80 h-screen space-y-6 ${
-              showFilters ? "block" : "hidden md:block"
-            }`}
-          >
-            <div className="flex flex-col gap-10">
-              <div>
-                <p className="text-2xl font-bold">Browse Your Favourite Products By Filtering</p>
-              </div>
-
-              {/* Price Range */}
-              <div className="mb-6">
+            {/* Price Range */}
+            <div>
               <Button
-                  size="sm"
-                  variant="flat"
-                  color="danger"
-                  className="mb-4"
-                  onPress={() => {
-                    setSelectedBrands([]);
-                    setPriceRange([0, 2000]);
-                    setSelectedCategory("All Items");
-                  }}
-                  startContent={<X size={16} />}
-                >
-                  Reset filters
-                </Button>
-                <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3">
-                  Price
-                </h4>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      size="sm"
-                      type="number"
-                      value={priceRange[0].toString()}
-                      onChange={(e) =>
-                        setPriceRange([
-                          parseInt(e.target.value) || 0,
-                          priceRange[1],
-                        ])
-                      }
-                      className="w-24"
-                    />
-                    <span className="text-gray-500">-</span>
-                    <Input
-                      size="sm"
-                      type="number"
-                      value={priceRange[1].toString()}
-                      onChange={(e) =>
-                        setPriceRange([
-                          priceRange[0],
-                          parseInt(e.target.value) || 2000,
-                        ])
-                      }
-                      className="w-24"
-                    />
-                  </div>
+                size="sm"
+                variant="flat"
+                color="danger"
+                className="mb-4"
+                onPress={() => {
+                  setSelectedBrands([]);
+                  setPriceRange([0, 2000]);
+                  setSelectedCategory("All Items");
+                }}
+                startContent={<X size={16} />}
+              >
+                Reset filters
+              </Button>
+              <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3">
+                Price
+              </h4>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Input
+                    size="sm"
+                    type="number"
+                    value={priceRange[0].toString()}
+                    onChange={(e) =>
+                      setPriceRange([
+                        parseInt(e.target.value) || 0,
+                        priceRange[1],
+                      ])
+                    }
+                    className="w-24"
+                  />
+                  <span className="text-gray-500">-</span>
+                  <Input
+                    size="sm"
+                    type="number"
+                    value={priceRange[1].toString()}
+                    onChange={(e) =>
+                      setPriceRange([
+                        priceRange[0],
+                        parseInt(e.target.value) || 2000,
+                      ])
+                    }
+                    className="w-24"
+                  />
                 </div>
               </div>
+            </div>
 
-              {/* Category Filters */}
+            {/* Category Filters */}
+            <div>
+              <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3">
+                Category
+              </h4>
+              <div className="flex flex-col gap-2">
+                {getCategoryDisplayNames().map((category) => (
+                  <Checkbox
+                    key={category}
+                    isSelected={selectedCategory === category}
+                    onChange={(isSelected) => {
+                      if (isSelected) {
+                        setSelectedCategory(category);
+                      }
+                    }}
+                  >
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      {category}
+                    </span>
+                  </Checkbox>
+                ))}
+              </div>
+            </div>
+
+            {/* Brand Filters */}
+            {brands.length > 0 && (
               <div>
                 <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3">
-                  Category
+                  Brands
                 </h4>
                 <div className="flex flex-col gap-2">
-                  {getCategoryDisplayNames().map((category) => (
+                  {brands.slice(0, 10).map((brand) => (
                     <Checkbox
-                      key={category}
-                      isSelected={selectedCategory === category}
+                      key={brand}
+                      isSelected={selectedBrands.includes(brand)}
                       onChange={(isSelected) => {
                         if (isSelected) {
-                          setSelectedCategory(category);
+                          setSelectedBrands([...selectedBrands, brand]);
+                        } else {
+                          setSelectedBrands(selectedBrands.filter(b => b !== brand));
                         }
                       }}
                     >
                       <span className="text-sm text-gray-700 dark:text-gray-300">
-                        {category}
+                        {brand}
                       </span>
                     </Checkbox>
                   ))}
                 </div>
               </div>
-
-              {/* Brand Filters */}
-              {brands.length > 0 && (
-                <div>
-                  <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3">
-                    Brands
-                  </h4>
-                  <div className="flex flex-col gap-2">
-                    {brands.slice(0, 10).map((brand) => (
-                      <Checkbox
-                        key={brand}
-                        isSelected={selectedBrands.includes(brand)}
-                        onChange={(isSelected) => {
-                          if (isSelected) {
-                            setSelectedBrands([...selectedBrands, brand]);
-                          } else {
-                            setSelectedBrands(selectedBrands.filter(b => b !== brand));
-                          }
-                        }}
-                      >
-                        <span className="text-sm text-gray-700 dark:text-gray-300">
-                          {brand}
-                        </span>
-                      </Checkbox>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ascending and descending */}
-              <div>
-                <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3">
-                  Sort by
-                </h4>
-                <div className="flex flex-col gap-2">
-                  <Checkbox
-                    isSelected={sortBy === "Price: Low to High"}
-                    onChange={(isSelected) => {
-                      if (isSelected) setSortBy("Price: Low to High");
-                    }}
-                  >
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Price: Low to High
-                    </span>
-                  </Checkbox>
-                  <Checkbox
-                    isSelected={sortBy === "Price: High to Low"}
-                    onChange={(isSelected) => {
-                      if (isSelected) setSortBy("Price: High to Low");
-                    }}
-                  >
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Price: High to Low
-                    </span>
-                  </Checkbox>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Products Grid */}
-          <div className="flex-1">
-            {/* categories tabs */}
-            <div className="flex gap-2 flex-wrap">
-              {getCategoryDisplayNames().map((category) => (
-                <Button 
-                  className="rounded-full" 
-                  key={category} 
-                  size="sm" 
-                  variant={selectedCategory === category ? "solid" : "ghost"}
-                  color={selectedCategory === category ? "primary" : "default"}
-                  onPress={() => handleCategorySelect(category)}
-                >
-                  {category}
-                </Button>
-              ))}
-            </div>
-            
-            {filteredProducts.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="text-gray-500 dark:text-gray-400">
-                  <ShoppingCart size={64} className="mx-auto mb-4 opacity-50" />
-                  <h3 className="text-xl font-semibold mb-2">
-                    No products found
-                  </h3>
-                  <p>Try adjusting your filters or search criteria</p>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 mt-4 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {filteredProducts.map((product) => (
-                    <div key={product._id} className="cursor-pointer group ">
-                      {/* Product Image */}
-                      <div className="relative md:h-60 md:w-68  overflow-hidden rounded-xl bg-gray-100 dark:bg-[#18181c] aspect-square group-hover:shadow-lg transition-shadow duration-200">
-                        <Link to={`/products/${product._id}`} className="block w-full h-full">
-                          {/* Product image */}
-                          <img
-                            src={product.images && product.images.length > 0 
-                              ? product.images[0] 
-                              : `https://demo.phlox.pro/shop-digital/wp-content/uploads/sites/127/2019/09/Laptop.png`}
-                            alt={product.name}
-                            width={300}
-                            height={300}
-                            className="w-full h-full object-cover"
-                          />
-                        </Link>
-                        
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleToggleWishlist(product._id);
-                          }}
-                          className="absolute top-3 right-3 z-10 p-2 bg-white dark:bg-gray-800 rounded-full shadow-md hover:shadow-lg transition-all duration-200"
-                          disabled={isAddingToCart === product._id}
-                        >
-                          <Heart
-                            size={18}
-                            className={`${
-                              wishlistItems.has(product._id)
-                                ? "fill-red-500 text-red-500"
-                                : "text-gray-400 hover:text-red-500"
-                            } transition-colors duration-200`}
-                          />
-                        </button>
-                        
-                        {/* Stock status badge */}
-                        {product.stockQuantity <= 0 && (
-                          <div className="absolute top-3 left-3 z-10">
-                            <Badge color="danger" variant="solid">Out of Stock</Badge>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="p-4 space-y-2">
-                        <Link to={`/products/${product._id}`} className="block group-hover:text-blue-600 transition-colors duration-200">
-                          <h3 className="text-md font-medium text-gray-900 dark:text-white line-clamp-2">
-                            {product.name}
-                          </h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {product.supplier || 'No Brand'}
-                          </p>
-                          <div className="flex items-center justify-between">
-                            <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                              ${formatPrice(product.price)}
-                            </p>
-                            {renderStars(product.stockQuantity)}
-                          </div>
-                        </Link>
-                        
-                        {/* Add to cart button */}
-                        <Button
-                          size="sm"
-                          color="primary"
-                          variant="solid"
-                          className="w-full"
-                          onPress={() => handleAddToCart(product)}
-                          isLoading={isAddingToCart === product._id}
-                          isDisabled={product.stockQuantity <= 0 || isAddingToCart === product._id}
-                          startContent={!isAddingToCart && <ShoppingCart size={16} />}
-                        >
-                          {isAddingToCart === product._id 
-                            ? "Adding..." 
-                            : product.stockQuantity <= 0 
-                              ? "Out of Stock" 
-                              : "Add to Cart"
-                          }
-                        </Button>
-                      </div>
-                    </div>
-                ))}
-              </div>
             )}
+
+            {/* Sort by */}
+            <div>
+              <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3">
+                Sort by
+              </h4>
+              <div className="flex flex-col gap-2">
+                <Checkbox
+                  isSelected={sortBy === "Price: Low to High"}
+                  onChange={(isSelected) => {
+                    if (isSelected) setSortBy("Price: Low to High");
+                  }}
+                >
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Price: Low to High
+                  </span>
+                </Checkbox>
+                <Checkbox
+                  isSelected={sortBy === "Price: High to Low"}
+                  onChange={(isSelected) => {
+                    if (isSelected) setSortBy("Price: High to Low");
+                  }}
+                >
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Price: High to Low
+                  </span>
+                </Checkbox>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Scrollable Products Area */}
+      <div style={{
+      scrollBehavior: 'smooth',
+      overflowY: 'scroll',
+      scrollbarWidth: 'thin',
+      scrollbarColor: 'transparent transparent',
+      scrollbarGutter: 'stable',
+    }} className="flex-1 overflow-hidden flex flex-col">
+        {/* Sticky Categories Header */}
+        <div className="sticky top-0 z-10   border-gray-200 dark:border-gray-700 px-6 py-4">
+          <div className="flex gap-2 flex-wrap">
+            {getCategoryDisplayNames().map((category) => (
+              <Button 
+                className="rounded-full" 
+                key={category} 
+                size="sm" 
+                variant={selectedCategory === category ? "solid" : "ghost"}
+                color={selectedCategory === category ? "primary" : "default"}
+                onPress={() => handleCategorySelect(category)}
+              >
+                {category}
+              </Button>
+            ))}
+          </div>
+        </div>
 
+        {/* Scrollable Products Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {filteredProducts.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-500 dark:text-gray-400">
+                <ShoppingCart size={64} className="mx-auto mb-4 opacity-50" />
+                <h3 className="text-xl font-semibold mb-2">
+                  No products found
+                </h3>
+                <p>Try adjusting your filters or search criteria</p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredProducts.map((product) => (
+                  <div key={product._id} className="cursor-pointer group">
+                    {/* Product Image */}
+                    <div className="relative overflow-hidden rounded-xl bg-gray-100 dark:bg-[#18181c] aspect-square group-hover:shadow-lg transition-shadow duration-200">
+                      <Link to={`/products/${product._id}`} className="block w-full h-full">
+                        {/* Product image */}
+                        <img
+                          src={product.images && product.images.length > 0 
+                            ? product.images[0] 
+                            : `https://demo.phlox.pro/shop-digital/wp-content/uploads/sites/127/2019/09/Laptop.png`}
+                          alt={product.name}
+                          width={300}
+                          height={300}
+                          className="w-full h-full object-cover"
+                        />
+                      </Link>
+                      
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleToggleWishlist(product._id);
+                        }}
+                        className="absolute top-3 right-3 z-10 p-2 bg-white dark:bg-gray-800 rounded-full shadow-md hover:shadow-lg transition-all duration-200"
+                        disabled={isAddingToCart === product._id}
+                      >
+                        <Heart
+                          size={18}
+                          className={`${
+                            wishlistItems.has(product._id)
+                              ? "fill-red-500 text-red-500"
+                              : "text-gray-400 hover:text-red-500"
+                          } transition-colors duration-200`}
+                        />
+                      </button>
+                      
+                      {/* Stock status badge */}
+                      {product.stockQuantity <= 0 && (
+                        <div className="absolute top-3 left-3 z-10">
+                          <Badge color="danger" variant="solid">Out of Stock</Badge>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="p-4 space-y-2">
+                      <Link to={`/products/${product._id}`} className="block group-hover:text-blue-600 transition-colors duration-200">
+                        <h3 className="text-md font-medium text-gray-900 dark:text-white line-clamp-2">
+                          {product.name}
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {product.supplier || 'No Brand'}
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                            ${formatPrice(product.price)}
+                          </p>
+                          {renderStars(product.stockQuantity)}
+                        </div>
+                      </Link>
+                      
+                      {/* Add to cart button */}
+                      <Button
+                        size="sm"
+                        color="primary"
+                        variant="solid"
+                        className="w-full"
+                        onPress={() => handleAddToCart(product)}
+                        isLoading={isAddingToCart === product._id}
+                        isDisabled={product.stockQuantity <= 0 || isAddingToCart === product._id}
+                        startContent={!isAddingToCart && <ShoppingCart size={16} />}
+                      >
+                        {isAddingToCart === product._id 
+                          ? "Adding..." 
+                          : product.stockQuantity <= 0 
+                            ? "Out of Stock" 
+                            : "Add to Cart"
+                        }
+                      </Button>
+                    </div>
+                  </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
