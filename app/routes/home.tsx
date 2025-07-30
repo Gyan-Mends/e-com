@@ -54,7 +54,7 @@ const Home = () => {
       
       // Load products and categories in parallel
       const [productsResponse, categoriesResponse, wishlistResponse] = await Promise.all([
-        productsAPI.getBestSellers(50) as Promise<APIResponse<Product[]>>,
+        productsAPI.getAll() as Promise<APIResponse<Product[]>>,
         categoriesAPI.getAll() as Promise<APIResponse<Category[]>>,
         wishlistAPI.getWishlist(undefined, getSessionId()).catch(() => ({ success: true, data: { items: [] } })) as Promise<any>
       ]);

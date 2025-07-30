@@ -1,10 +1,9 @@
 import axios from 'axios';
+import { config } from './config';
 
 // Create axios instance pointing to POS system
 const api = axios.create({
-  baseURL: typeof window !== 'undefined' 
-    ? 'https://pos-online-rho.vercel.app/' // POS system URL when running in browser
-    : 'https://pos-online-rho.vercel.app/', // POS system URL when running on server
+  baseURL: config.POS_API_URL,
   timeout: 10000,
   headers: {
     'Accept': 'application/json',
