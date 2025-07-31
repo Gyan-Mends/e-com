@@ -2,7 +2,8 @@
 
 export const config = {
   // API URLs
-  POS_API_URL: import.meta.env.VITE_POS_API_URL || 'http://localhost:5173',
+  POS_API_URL: import.meta.env.VITE_POS_API_URL,
+  local_api_url: 'http://localhost:5173',
   
   // Paystack Configuration
   PAYSTACK_PUBLIC_KEY: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_2a5fe03e4f2b193e9a6056d4683391e2aae03d21',
