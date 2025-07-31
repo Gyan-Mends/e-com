@@ -386,14 +386,8 @@ const Home = () => {
         </div>
       </div>
 
-      {/* Scrollable Products Area */}
-      <div style={{
-      scrollBehavior: 'smooth',
-      overflowY: 'scroll',
-      scrollbarWidth: 'thin',
-      scrollbarColor: 'transparent transparent',
-      scrollbarGutter: 'stable',
-    }} className="flex-1 overflow-hidden flex flex-col">
+      {/* Products Area */}
+      <div className="flex-1 flex flex-col">
         {/* Sticky Categories Header */}
         <div className="sticky top-0 z-10   border-gray-200 dark:border-gray-700 px-6 py-4">
           <div className="flex gap-2 flex-wrap">
@@ -413,7 +407,16 @@ const Home = () => {
         </div>
 
         {/* Scrollable Products Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div 
+          style={{
+            scrollBehavior: 'smooth',
+            overflowY: 'scroll',
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'transparent transparent',
+            scrollbarGutter: 'stable',
+          }} 
+          className="flex-1 overflow-y-auto p-6"
+        >
           {filteredProducts.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-gray-500 dark:text-gray-400">
