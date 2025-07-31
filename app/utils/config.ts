@@ -1,16 +1,16 @@
 // Configuration for the e-commerce application
 
 export const config = {
-  // API URLs
+  // API URLs - hardcoded to localhost
   POS_API_URL: import.meta.env.VITE_POS_API_URL,
-  local_api_url: 'http://localhost:5173',
+
   
   // Paystack Configuration
-  PAYSTACK_PUBLIC_KEY: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_2a5fe03e4f2b193e9a6056d4683391e2aae03d21',
+  PAYSTACK_PUBLIC_KEY: 'pk_test_2a5fe03e4f2b193e9a6056d4683391e2aae03d21',
   
   // App Configuration
-  APP_NAME: import.meta.env.VITE_APP_NAME || 'ShopHub',
-  APP_ENV: import.meta.env.VITE_APP_ENV || 'development',
+  APP_NAME: 'ShopHub',
+  APP_ENV: 'development',
   
   // Payment Configuration (Ghana)
   CURRENCY: 'GHS', // Ghanaian Cedi
@@ -29,16 +29,4 @@ export const config = {
 // Helper function to get full API URL
 export const getApiUrl = (endpoint: string): string => {
   return `${config.POS_API_URL}${endpoint}`;
-};
-
-// Helper function to check if we're in development
-export const isDevelopment = (): boolean => {
-  return config.APP_ENV === 'development';
-};
-
-// Helper function to log only in development
-export const devLog = (message: string, ...args: any[]): void => {
-  if (isDevelopment()) {
-    console.log(`[${config.APP_NAME}] ${message}`, ...args);
-  }
 }; 
