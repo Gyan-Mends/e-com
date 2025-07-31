@@ -54,7 +54,7 @@ const Home = () => {
       
       // Load products and categories in parallel
       const [productsResponse, categoriesResponse, wishlistResponse] = await Promise.all([
-        productsAPI.getAll() as Promise<APIResponse<Product[]>>,
+        productsAPI.getAll({ limit: 1000 }) as Promise<APIResponse<Product[]>>,
         categoriesAPI.getAll() as Promise<APIResponse<Category[]>>,
         wishlistAPI.getWishlist(undefined, getSessionId()).catch(() => ({ success: true, data: { items: [] } })) as Promise<any>
       ]);
@@ -124,8 +124,7 @@ const Home = () => {
         product.price >= priceRange[0] && product.price <= priceRange[1]
     );
 
-    // Filter out products with zero stock quantity
-    filtered = filtered.filter((product) => product.stockQuantity > 0);
+    // Products with zero stock are already filtered out by the API
 
     // Sort products
     if (sortBy === "Top rated") {
