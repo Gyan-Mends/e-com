@@ -11,6 +11,7 @@ import {
 } from "@heroui/react";
 import { Eye, EyeOff, Lock, Mail, ArrowLeft, UserPlus, LogIn } from "lucide-react";
 import { successToast, errorToast } from "../components/toast";
+import { useAuditLogger } from "~/hooks/useAuditLogger";
 
 // API function to login
 const loginAPI = async (email: string, password: string, rememberMe: boolean = false) => {
@@ -46,6 +47,9 @@ export default function LoginPage() {
     rememberMe: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // Audit logging
+  const { logUserAction } = useAuditLogger();
   
   const redirectTo = searchParams.get('redirect') || 'home';
 
@@ -94,6 +98,16 @@ export default function LoginPage() {
           type: 'customer',
           loginTime: new Date().toISOString(),
         }));
+        
+        // Log successful login
+        await logUserAction('login', {
+          userId: response.data.customer._id || response.data.customer.id,
+          email: formData.email,
+          loginMethod: 'Email',
+          rememberMe: formData.rememberMe,
+          redirectTo,
+          timestamp: new Date().toISOString()
+        });
         
         successToast("Login successful! Welcome back.");
         // Redirect to intended page

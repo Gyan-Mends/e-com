@@ -55,10 +55,12 @@ import {
   getSessionId 
 } from "../utils/api";
 import { config, getApiUrl, devLog } from "../utils/config";
+import { useAuditLogger } from "../hooks/useAuditLogger";
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { logCartAction, logAuditEvent } = useAuditLogger();
   
   const [currentStep, setCurrentStep] = useState(1);
   const [cart, setCart] = useState<Cart | null>(null);
@@ -108,6 +110,20 @@ const CheckoutPage = () => {
         if (response?.success && response.data) {
           if (response.data.items && response.data.items.length > 0) {
             setCart(response.data);
+            
+            // Log checkout started
+            logCartAction('checkout_started', {
+              itemCount: response.data.totalItems || 0,
+              total: response.data.totalAmount || 0,
+              items: response.data.items?.map((item: any) => ({
+                productId: item.product._id,
+                productName: item.product.name,
+                quantity: item.quantity,
+                price: item.price
+              })) || [],
+              customerEmail: user.email,
+              customerId: user._id || user.id
+            });
           } else {
             // Redirect to cart if empty
             navigate('/cart');
@@ -153,7 +169,7 @@ const CheckoutPage = () => {
 
     loadCart();
     loadTaxConfiguration();
-  }, [navigate]);
+  }, [navigate, logCartAction]);
   
   // Form state
   const [customerInfo, setCustomerInfo] = useState({
@@ -278,10 +294,44 @@ const CheckoutPage = () => {
     return new Promise<{ success: boolean; reference?: string }>((resolve) => {
       setPaymentStatus('processing');
       
+      // Log payment attempt
+      logAuditEvent({
+        action: 'payment_attempted',
+        resource: 'checkout',
+        details: {
+          amount: total,
+          currency: 'GHS',
+          paymentMethod: 'paystack',
+          customerEmail: customerInfo.email,
+          itemCount: cart?.totalItems || 0,
+          shippingMethod,
+          taxEnabled: taxConfig.enabled,
+          taxAmount: tax
+        },
+        severity: 'high',
+        status: 'info',
+        source: 'web'
+      });
+      
       // Check if Paystack is loaded
       if (!window.PaystackPop) {
         console.error('❌ Paystack not loaded');
         setPaymentStatus('failed');
+        
+        // Log payment failure
+        logAuditEvent({
+          action: 'payment_failed',
+          resource: 'checkout',
+          details: {
+            error: 'Paystack not loaded',
+            amount: total,
+            paymentMethod: 'paystack'
+          },
+          severity: 'high',
+          status: 'error',
+          source: 'web'
+        });
+        
         resolve({ success: false });
         return;
       }
@@ -349,6 +399,25 @@ const CheckoutPage = () => {
           setPaymentStatus('success');
           setPaymentReference(response.reference);
           
+          // Log successful payment
+          logAuditEvent({
+            action: 'payment_successful',
+            resource: 'checkout',
+            details: {
+              transactionReference: response.reference,
+              amount: total,
+              currency: 'GHS',
+              paymentMethod: 'paystack',
+              customerEmail: customerInfo.email,
+              itemCount: cart?.totalItems || 0,
+              shippingMethod,
+              taxAmount: tax
+            },
+            severity: 'high',
+            status: 'success',
+            source: 'web'
+          });
+          
           // Verify transaction (in production, this should be done on your backend)
           verifyTransaction(response.reference)
             .then((verified: boolean) => {
@@ -357,18 +426,65 @@ const CheckoutPage = () => {
               } else {
                 console.error('❌ Transaction verification failed');
                 setPaymentStatus('failed');
+                
+                // Log verification failure
+                logAuditEvent({
+                  action: 'payment_verification_failed',
+                  resource: 'checkout',
+                  details: {
+                    transactionReference: response.reference,
+                    amount: total,
+                    paymentMethod: 'paystack'
+                  },
+                  severity: 'high',
+                  status: 'error',
+                  source: 'web'
+                });
+                
                 resolve({ success: false });
               }
             })
             .catch((error: any) => {
               console.error('❌ Error verifying transaction:', error);
               setPaymentStatus('failed');
+              
+              // Log verification error
+              logAuditEvent({
+                action: 'payment_verification_error',
+                resource: 'checkout',
+                details: {
+                  transactionReference: response.reference,
+                  error: error.message,
+                  amount: total,
+                  paymentMethod: 'paystack'
+                },
+                severity: 'high',
+                status: 'error',
+                source: 'web'
+              });
+              
               resolve({ success: false });
             });
         },
         onClose: function() {
           console.log('❌ Payment window closed by user');
           setPaymentStatus('pending'); // Reset to pending, not failed
+          
+          // Log payment abandoned
+          logAuditEvent({
+            action: 'payment_abandoned',
+            resource: 'checkout',
+            details: {
+              amount: total,
+              paymentMethod: 'paystack',
+              customerEmail: customerInfo.email,
+              itemCount: cart?.totalItems || 0
+            },
+            severity: 'medium',
+            status: 'warning',
+            source: 'web'
+          });
+          
           resolve({ success: false });
         }
       });
@@ -387,6 +503,13 @@ const CheckoutPage = () => {
       setIsProcessing(false);
       
       if (!paymentResult.success) {
+        // Log checkout abandoned
+        logCartAction('checkout_abandoned', {
+          itemCount: cart?.totalItems || 0,
+          total: cart?.totalAmount || 0,
+          reason: 'payment_failed',
+          customerEmail: customerInfo.email
+        });
         return; // Don't proceed if payment failed
       }
     }
@@ -412,6 +535,23 @@ const CheckoutPage = () => {
       setOrderId(newOrderId);
       setOrderPlaced(true);
       
+      // Log successful order completion
+      logCartAction('checkout_completed', {
+        orderId: newOrderId,
+        paymentReference,
+        itemCount: cart?.totalItems || 0,
+        total: cart?.totalAmount || 0,
+        customerEmail: customerInfo.email,
+        shippingMethod,
+        taxAmount: tax,
+        items: cart?.items?.map((item: any) => ({
+          productId: item.product._id,
+          productName: item.product.name,
+          quantity: item.quantity,
+          price: item.price
+        })) || []
+      });
+      
       // Clear the cart after successful order
       const sessionId = getSessionId();
       await cartAPI.clearCart(undefined, sessionId);
@@ -419,6 +559,22 @@ const CheckoutPage = () => {
       onOpen();
     } catch (error) {
       console.error('❌ Error creating order:', error);
+      
+      // Log order creation error
+      logAuditEvent({
+        action: 'order_creation_failed',
+        resource: 'checkout',
+        details: {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          paymentReference,
+          customerEmail: customerInfo.email,
+          itemCount: cart?.totalItems || 0,
+          total: cart?.totalAmount || 0
+        },
+        severity: 'high',
+        status: 'error',
+        source: 'web'
+      });
     } finally {
       setIsProcessing(false);
     }

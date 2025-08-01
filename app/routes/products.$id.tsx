@@ -38,6 +38,7 @@ import {
   getCategoryName,
   getSessionId,
 } from "../utils/api";
+import { useAuditLogger } from "../hooks/useAuditLogger";
 
 // Loader function to fetch product and related data
 export async function loader({ params }: { params: { id: string } }) {
@@ -88,6 +89,8 @@ const ProductDetailPage = () => {
     categories: APIResponse<Category[]>;
     relatedProducts: APIResponse<Product[]>;
   };
+  const { logProductAction } = useAuditLogger();
+  const { id } = useParams();
 
   // Helper function to calculate rating based on stock quantity
   const calculateRating = (stockQuantity: number) => {
@@ -112,6 +115,22 @@ const ProductDetailPage = () => {
     ? relatedProducts.data.filter(product => product.stockQuantity > 0)
     : [];
 
+  // Log product view on component mount
+  useEffect(() => {
+    if (productData) {
+      logProductAction('product_viewed', productData._id, {
+        productName: productData.name,
+        productSku: productData.sku,
+        category: getCategoryName(productData.categoryId, categoryList),
+        price: productData.price,
+        stockQuantity: productData.stockQuantity,
+        inStock: productData.stockQuantity > 0,
+        rating: calculateRating(productData.stockQuantity),
+        reviewCount: getReviewCount(productData.stockQuantity, calculateRating(productData.stockQuantity))
+      });
+    }
+  }, [productData, logProductAction, categoryList]);
+
   // Add to cart functionality
   const handleAddToCart = async () => {
     if (!productData) return;
@@ -133,14 +152,40 @@ const ProductDetailPage = () => {
           } added to cart!`
         );
         setTimeout(() => setMessage(""), 3000);
+        
+        // Log successful add to cart
+        logProductAction('product_added_to_cart', productData._id, {
+          productName: productData.name,
+          productSku: productData.sku,
+          quantity: quantity,
+          price: productData.price,
+          totalPrice: productData.price * quantity,
+          category: getCategoryName(productData.categoryId, categoryList)
+        });
       } else {
         setMessage("Failed to add to cart");
         setTimeout(() => setMessage(""), 3000);
+        
+        // Log failed add to cart
+        logProductAction('product_add_to_cart_failed', productData._id, {
+          productName: productData.name,
+          productSku: productData.sku,
+          quantity: quantity,
+          error: response?.message || 'Unknown error'
+        });
       }
     } catch (error) {
       console.error("Error adding to cart:", error);
       setMessage("Error adding to cart");
       setTimeout(() => setMessage(""), 3000);
+      
+      // Log error adding to cart
+      logProductAction('product_add_to_cart_error', productData._id, {
+        productName: productData.name,
+        productSku: productData.sku,
+        quantity: quantity,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     } finally {
       setIsAddingToCart(false);
     }
@@ -160,21 +205,49 @@ const ProductDetailPage = () => {
       )) as any;
 
       if (response && response.success) {
-        setInWishlist(response.data.inWishlist);
+        const newWishlistStatus = response.data.inWishlist;
+        setInWishlist(newWishlistStatus);
         setMessage(
-          response.data.inWishlist
+          newWishlistStatus
             ? `${productData.name} added to wishlist!`
             : `${productData.name} removed from wishlist!`
         );
         setTimeout(() => setMessage(""), 3000);
+        
+        // Log wishlist action
+        logProductAction(
+          newWishlistStatus ? 'product_added_to_wishlist' : 'product_removed_from_wishlist', 
+          productData._id, 
+          {
+            productName: productData.name,
+            productSku: productData.sku,
+            category: getCategoryName(productData.categoryId, categoryList),
+            price: productData.price,
+            action: newWishlistStatus ? 'added' : 'removed'
+          }
+        );
       } else {
         setMessage("Failed to update wishlist");
         setTimeout(() => setMessage(""), 3000);
+        
+        // Log wishlist failure
+        logProductAction('product_wishlist_failed', productData._id, {
+          productName: productData.name,
+          productSku: productData.sku,
+          error: response?.message || 'Unknown error'
+        });
       }
     } catch (error) {
       console.error("Error toggling wishlist:", error);
       setMessage("Error updating wishlist");
       setTimeout(() => setMessage(""), 3000);
+      
+      // Log wishlist error
+      logProductAction('product_wishlist_error', productData._id, {
+        productName: productData.name,
+        productSku: productData.sku,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     } finally {
       setIsTogglingWishlist(false);
     }

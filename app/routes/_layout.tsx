@@ -41,10 +41,14 @@ import {
 } from "lucide-react";
 import { cartAPI, wishlistAPI } from "~/utils/api";
 import { getSessionId } from "~/utils/api";
+import { useAuditLogger } from "~/hooks/useAuditLogger";
 
 export default function Layout() {
   // Check for user authentication
   const [user, setUser] = useState<any>(null);
+  
+  // Audit logging
+  const { logUserAction } = useAuditLogger();
   
   useEffect(() => {
     // Check if user is logged in
@@ -126,9 +130,21 @@ export default function Layout() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      // Log logout event before clearing data
+      await logUserAction('logout', {
+        userId: user?._id || user?.id,
+        timestamp: new Date().toISOString(),
+        sessionDuration: Date.now() - parseInt(sessionStorage.getItem('sessionStartTime') || '0')
+      });
+    } catch (error) {
+      console.error('Failed to log logout event:', error);
+    }
+
     // Clear user data and navigate to login
     localStorage.removeItem("user");
+    sessionStorage.clear();
     setUser(null);
     navigate("/login");
   };

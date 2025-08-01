@@ -36,9 +36,11 @@ import {
   getCategoryName,
   getSessionId 
 } from "../utils/api";
+import { useAuditLogger } from "../hooks/useAuditLogger";
 
 const CartPage = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { logCartAction, logProductAction } = useAuditLogger();
   
   const [cart, setCart] = useState<Cart | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,9 +75,28 @@ const CartPage = () => {
         if (cartResponse && cartResponse.success && cartResponse.data) {
           setCart(cartResponse.data);
           console.log('🛒 Cart loaded successfully:', cartResponse.data);
+          
+          // Log cart viewed
+          logCartAction('cart_viewed', {
+            itemCount: cartResponse.data.totalItems || 0,
+            total: cartResponse.data.totalAmount || 0,
+            items: cartResponse.data.items?.map((item: any) => ({
+              productId: item.product._id,
+              productName: item.product.name,
+              quantity: item.quantity,
+              price: item.price
+            })) || []
+          });
         } else {
           console.log('🛒 No cart found or empty cart');
           setCart(null);
+          
+          // Log empty cart viewed
+          logCartAction('cart_viewed', {
+            itemCount: 0,
+            total: 0,
+            items: []
+          });
         }
       } catch (error) {
         console.error('❌ Error loading cart:', error);
@@ -114,7 +135,7 @@ const CartPage = () => {
 
     loadCart();
     loadTaxConfiguration();
-  }, []);
+  }, [logCartAction]);
 
   // Calculate totals
   const subtotal = cart?.totalAmount || 0;
@@ -152,6 +173,11 @@ const CartPage = () => {
         setCart(response.data);
         setMessage('Cart updated successfully');
         setTimeout(() => setMessage(''), 2000);
+        logProductAction('cart_item_quantity_updated', {
+          productId: productId,
+          newQuantity: newQuantity,
+          oldQuantity: newQuantity - 1 // Assuming quantity was 1 less before update
+        });
       } else {
         setMessage('Failed to update cart');
         setTimeout(() => setMessage(''), 3000);
@@ -189,6 +215,10 @@ const CartPage = () => {
         setCart(response.data);
         setMessage('Item removed from cart');
         setTimeout(() => setMessage(''), 2000);
+        logProductAction('cart_item_removed', {
+          productId: productId,
+          quantity: response.data.items.find((item: any) => item.product._id === productId)?.quantity || 0
+        });
       } else {
         console.log('🗑️ Remove failed:', response);
         setMessage('Failed to remove item');
@@ -218,6 +248,11 @@ const CartPage = () => {
         setCart(null);
         setMessage('Cart cleared successfully');
         setTimeout(() => setMessage(''), 2000);
+        logCartAction('cart_cleared', {
+          itemCount: 0,
+          total: 0,
+          items: []
+        });
       } else {
         setMessage('Failed to clear cart');
         setTimeout(() => setMessage(''), 3000);
@@ -250,6 +285,10 @@ const CartPage = () => {
         await removeFromCart(item.product._id);
         setMessage(`${item.product.name} moved to wishlist`);
         setTimeout(() => setMessage(''), 3000);
+        logProductAction('cart_item_moved_to_wishlist', {
+          productId: item.product._id,
+          quantity: item.quantity
+        });
       } else {
         setMessage('Failed to move to wishlist');
         setTimeout(() => setMessage(''), 3000);

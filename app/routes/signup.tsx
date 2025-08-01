@@ -13,6 +13,7 @@ import {
 } from "@heroui/react";
 import { Eye, EyeOff, Lock, Mail, User, ArrowLeft, UserPlus, Phone } from "lucide-react";
 import { successToast, errorToast } from "../components/toast";
+import { useAuditLogger } from "../hooks/useAuditLogger";
 
 // API function to create customer account
 const signupAPI = async (customerData: {
@@ -50,6 +51,7 @@ export default function SignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
+  const { logUserAction, logAuditEvent } = useAuditLogger();
   
   const redirectTo = searchParams.get('redirect') || '/';
   const [formData, setFormData] = useState({
@@ -110,10 +112,49 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      // Log form validation failure
+      logAuditEvent({
+        action: 'signup_form_validation_failed',
+        resource: 'user_registration',
+        details: {
+          errors: Object.keys(errors),
+          formData: {
+            hasFirstName: !!formData.firstName.trim(),
+            hasLastName: !!formData.lastName.trim(),
+            hasEmail: !!formData.email,
+            hasPassword: !!formData.password,
+            hasConfirmPassword: !!formData.confirmPassword,
+            passwordLength: formData.password.length,
+            passwordsMatch: formData.password === formData.confirmPassword,
+            agreedToTerms: agreeToTerms,
+            emailFormat: /\S+@\S+\.\S+/.test(formData.email)
+          }
+        },
+        severity: 'medium',
+        status: 'warning',
+        source: 'web'
+      });
+      return;
+    }
 
     setIsLoading(true);
     setErrors({});
+    
+    // Log signup attempt
+    logAuditEvent({
+      action: 'signup_attempted',
+      resource: 'user_registration',
+      details: {
+        email: formData.email.trim().toLowerCase(),
+        hasPhone: !!formData.phone.trim(),
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString()
+      },
+      severity: 'medium',
+      status: 'info',
+      source: 'web'
+    });
     
     try {
       // Create customer account
@@ -126,17 +167,61 @@ export default function SignupPage() {
       });
       
       if (signupResponse.success) {
+        // Log successful registration
+        logUserAction('user_registered', {
+          email: formData.email.trim().toLowerCase(),
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          hasPhone: !!formData.phone.trim(),
+          registrationMethod: 'email',
+          success: true,
+          responseData: {
+            customerId: signupResponse.customer?._id || signupResponse.customer?.id,
+            message: signupResponse.message
+          }
+        });
+        
         // Show success message and redirect to login
         successToast("Account created successfully! Please login to continue.");
         setTimeout(() => {
           navigate(`/login?redirect=${redirectTo}`);
         }, 2000);
       } else {
+        // Log failed registration
+        logAuditEvent({
+          action: 'signup_failed',
+          resource: 'user_registration',
+          details: {
+            email: formData.email.trim().toLowerCase(),
+            error: signupResponse.message || 'Unknown error',
+            responseData: signupResponse
+          },
+          severity: 'medium',
+          status: 'error',
+          source: 'web'
+        });
+        
         errorToast(signupResponse.message || "Signup failed");
       }
       
     } catch (error: any) {
       console.error("Signup error:", error);
+      
+      // Log registration error
+      logAuditEvent({
+        action: 'signup_error',
+        resource: 'user_registration',
+        details: {
+          email: formData.email.trim().toLowerCase(),
+          error: error.message || 'Unknown error',
+          errorType: error.name || 'Error',
+          stack: error.stack
+        },
+        severity: 'high',
+        status: 'error',
+        source: 'web'
+      });
+      
       if (error.message.includes('already exists')) {
         errorToast("An account with this email already exists");
       } else if (error.message.includes('400')) {
