@@ -26,6 +26,7 @@ import {
   getSessionId,
 } from "../utils/api";
 import { successToast, errorToast } from "../components/toast";
+import { eventBus, EVENTS } from "../utils/eventBus";
 
 const Home = () => {
   // State management
@@ -38,9 +39,11 @@ const Home = () => {
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [wishlistItems, setWishlistItems] = useState<Set<string>>(new Set());
   const [isAddingToCart, setIsAddingToCart] = useState<string | null>(null);
+  const [addedToCartItems, setAddedToCartItems] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const [brands, setBrands] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Load data on component mount
   useEffect(() => {
@@ -99,6 +102,17 @@ const Home = () => {
 
     let filtered = [...products];
 
+    // Filter by search term
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter((product) =>
+        product.name.toLowerCase().includes(searchLower) ||
+        product.description?.toLowerCase().includes(searchLower) ||
+        product.sku.toLowerCase().includes(searchLower) ||
+        (product.supplier || '').toLowerCase().includes(searchLower)
+      );
+    }
+
     // Filter by category
     if (selectedCategory !== "All Items") {
       filtered = filtered.filter((product) => {
@@ -137,17 +151,30 @@ const Home = () => {
     }
 
     setFilteredProducts(filtered);
-  }, [products, categories, selectedCategory, selectedBrands, priceRange, sortBy]);
+  }, [products, categories, selectedCategory, selectedBrands, priceRange, sortBy, searchTerm]);
 
     // Add to cart function
   const handleAddToCart = async (product: Product) => {
     setIsAddingToCart(product._id);
     try {
       const sessionId = getSessionId();
+      
+      // Use addToCart - the backend will handle updating quantity if item already exists
       const response = await cartAPI.addToCart(undefined, sessionId, product._id, 1) as any;
       
       if (response.success) {
-        successToast(`${product.name} added to cart!`);
+        // Temporarily show "Added to Cart" text
+        setAddedToCartItems(prev => new Set([...prev, product._id]));
+        setTimeout(() => {
+          setAddedToCartItems(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(product._id);
+            return newSet;
+          });
+        }, 2000); // Show for 2 seconds
+        
+        // Emit cart update event
+        eventBus.emit(EVENTS.CART_UPDATED, { totalItems: response.data?.totalItems || 0 });
       } else {
         errorToast(response.message || "Error adding to cart");
       }
@@ -167,14 +194,20 @@ const Home = () => {
       
       if (response.success) {
         const newWishlistItems = new Set(wishlistItems);
-        if (wishlistItems.has(productId)) {
+
+        // Use the server response to determine the action
+        if (response.data?.action === "removed") {
           newWishlistItems.delete(productId);
-          successToast("Removed from wishlist");
-        } else {
+        } else if (response.data?.action === "added") {
           newWishlistItems.add(productId);
-          successToast("Added to wishlist");
         }
+
         setWishlistItems(newWishlistItems);
+        
+        // Emit wishlist update event
+        eventBus.emit(EVENTS.WISHLIST_UPDATED, {
+          itemCount: response.data?.itemCount || 0
+        });
       } else {
         errorToast(response.message || "Error updating wishlist");
       }
@@ -250,6 +283,22 @@ const Home = () => {
           <div className="flex flex-col gap-8">
             <div>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">Browse Your Favourite Products By Filtering</p>
+            </div>
+
+            {/* Search Bar */}
+            <div>
+              <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3">
+                Search Products
+              </h4>
+              <Input
+                size="md"
+                placeholder="Search by name, description, SKU, or brand..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                startContent={<Search size={18} />}
+                isClearable
+                onClear={() => setSearchTerm("")}
+              />
             </div>
 
             {/* Price Range */}
@@ -502,9 +551,11 @@ const Home = () => {
                       >
                         {isAddingToCart === product._id 
                           ? "Adding..." 
-                          : product.stockQuantity <= 0 
-                            ? "Out of Stock" 
-                            : "Add to Cart"
+                          : addedToCartItems.has(product._id)
+                            ? "Added to Cart"
+                            : product.stockQuantity <= 0 
+                              ? "Out of Stock" 
+                              : "Add to Cart"
                         }
                       </Button>
                     </div>

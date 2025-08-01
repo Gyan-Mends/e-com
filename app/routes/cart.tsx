@@ -37,6 +37,7 @@ import {
   getSessionId 
 } from "../utils/api";
 import { useAuditLogger } from "../hooks/useAuditLogger";
+import { eventBus, EVENTS } from "../utils/eventBus";
 
 const CartPage = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -170,15 +171,24 @@ const CartPage = () => {
       ) as any;
       
       if (response && response.success) {
+        console.log('🔄 Cart update response:', response.data);
+        console.log('🔄 Previous cart state:', cart);
         setCart(response.data);
+        console.log('🔄 New cart state set:', response.data);
         setMessage('Cart updated successfully');
         setTimeout(() => setMessage(''), 2000);
-        logProductAction('cart_item_quantity_updated', {
-          productId: productId,
+        
+        // Emit cart update event
+        eventBus.emit(EVENTS.CART_UPDATED, {
+          totalItems: response.data.totalItems || 0
+        });
+        
+        logProductAction('cart_item_quantity_updated', productId, {
           newQuantity: newQuantity,
           oldQuantity: newQuantity - 1 // Assuming quantity was 1 less before update
         });
       } else {
+        console.log('❌ Cart update failed:', response);
         setMessage('Failed to update cart');
         setTimeout(() => setMessage(''), 3000);
       }
@@ -215,8 +225,13 @@ const CartPage = () => {
         setCart(response.data);
         setMessage('Item removed from cart');
         setTimeout(() => setMessage(''), 2000);
-        logProductAction('cart_item_removed', {
-          productId: productId,
+        
+        // Emit cart update event
+        eventBus.emit(EVENTS.CART_UPDATED, {
+          totalItems: response.data.totalItems || 0
+        });
+        
+        logProductAction('cart_item_removed', productId, {
           quantity: response.data.items.find((item: any) => item.product._id === productId)?.quantity || 0
         });
       } else {
@@ -248,6 +263,12 @@ const CartPage = () => {
         setCart(null);
         setMessage('Cart cleared successfully');
         setTimeout(() => setMessage(''), 2000);
+        
+        // Emit cart update event
+        eventBus.emit(EVENTS.CART_UPDATED, {
+          totalItems: 0
+        });
+        
         logCartAction('cart_cleared', {
           itemCount: 0,
           total: 0,
@@ -285,8 +306,7 @@ const CartPage = () => {
         await removeFromCart(item.product._id);
         setMessage(`${item.product.name} moved to wishlist`);
         setTimeout(() => setMessage(''), 3000);
-        logProductAction('cart_item_moved_to_wishlist', {
-          productId: item.product._id,
+        logProductAction('cart_item_moved_to_wishlist', item.product._id, {
           quantity: item.quantity
         });
       } else {

@@ -25,7 +25,8 @@ const signupAPI = async (customerData: {
   address?: any;
   dateOfBirth?: string;
 }) => {
-  const response = await fetch('http://localhost:5173/api/customers/auth/signup', {
+  const POS_API_URL = import.meta.env.VITE_POS_API_URL || 'http://localhost:5177';
+  const response = await fetch(`${POS_API_URL}/api/customers/auth/signup`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -112,7 +112,8 @@ export const useAuditLogger = () => {
       console.log('📤 E-Commerce: Sending audit data:', auditData);
 
       // Send to POS audit API (shared audit system)
-      const response = await fetch('http://localhost:5173/api/audit', {
+      const POS_API_URL = import.meta.env.VITE_POS_API_URL || 'http://localhost:5177';
+      const response = await fetch(`${POS_API_URL}/api/audit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

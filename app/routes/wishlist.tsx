@@ -11,6 +11,7 @@ import {
   formatPrice,
   getSessionId,
 } from "../utils/api";
+import { eventBus, EVENTS } from "../utils/eventBus";
 
 const WishlistPage = () => {
   const [wishlist, setWishlist] = useState<Wishlist | null>(null);
@@ -82,14 +83,19 @@ const WishlistPage = () => {
           const updatedItems = wishlist.items.filter(
             (item) => item.product._id !== productId
           );
-          setWishlist({
-            ...wishlist,
-            items: updatedItems,
-            itemCount: updatedItems.length,
-          });
+                  setWishlist({
+          ...wishlist,
+          items: updatedItems,
+          itemCount: updatedItems.length,
+        });
         }
         setMessage("Item removed from wishlist");
         setTimeout(() => setMessage(""), 2000);
+        
+        // Emit wishlist update event
+        eventBus.emit(EVENTS.WISHLIST_UPDATED, {
+          itemCount: updatedItems.length
+        });
       } else {
         setMessage("Failed to remove item");
         setTimeout(() => setMessage(""), 3000);
@@ -122,6 +128,11 @@ const WishlistPage = () => {
       if (response && response.success) {
         setMessage(`${item.product.name} added to cart!`);
         setTimeout(() => setMessage(""), 3000);
+        
+        // Emit cart update event
+        eventBus.emit(EVENTS.CART_UPDATED, {
+          totalItems: response.data?.totalItems || 0
+        });
       } else {
         setMessage("Failed to add to cart");
         setTimeout(() => setMessage(""), 3000);

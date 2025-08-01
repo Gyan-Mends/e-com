@@ -42,6 +42,7 @@ import {
 import { cartAPI, wishlistAPI } from "~/utils/api";
 import { getSessionId } from "~/utils/api";
 import { useAuditLogger } from "~/hooks/useAuditLogger";
+import { eventBus, EVENTS } from "~/utils/eventBus";
 
 export default function Layout() {
   // Check for user authentication
@@ -80,19 +81,40 @@ export default function Layout() {
         // Load wishlist count
         const wishlistResponse = await wishlistAPI.getWishlist(undefined, sessionId) as any;
         if (wishlistResponse?.success && wishlistResponse.data) {
-          setWishlistItems(wishlistResponse.data.length || 0);
+          setWishlistItems(wishlistResponse.data.itemCount || 0);
         }
       } catch (error) {
         console.error('Error loading counts:', error);
       }
     };
 
+    // Listen for real-time updates
+    const handleCartUpdate = (data: any) => {
+      if (data?.totalItems !== undefined) {
+        setCartItems(data.totalItems);
+      }
+    };
+
+    const handleWishlistUpdate = (data: any) => {
+      if (data?.itemCount !== undefined) {
+        setWishlistItems(data.itemCount);
+      }
+    };
+
+    // Subscribe to events
+    eventBus.on(EVENTS.CART_UPDATED, handleCartUpdate);
+    eventBus.on(EVENTS.WISHLIST_UPDATED, handleWishlistUpdate);
+
     loadCounts();
     
     // Refresh counts every 30 seconds
     const interval = setInterval(loadCounts, 30000);
     
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      eventBus.off(EVENTS.CART_UPDATED, handleCartUpdate);
+      eventBus.off(EVENTS.WISHLIST_UPDATED, handleWishlistUpdate);
+    };
   }, [location.pathname]); // Reload counts when navigating
 
   // Dark mode toggle effect - default to dark mode

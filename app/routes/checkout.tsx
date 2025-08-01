@@ -82,7 +82,9 @@ const CheckoutPage = () => {
   
   // Load cart data and check authentication
   useEffect(() => {
-    const loadCart = async () => {
+    let mounted = true;
+    
+    const loadInitialData = async () => {
       try {
         // Check if user is authenticated
         const userData = localStorage.getItem("user");
@@ -93,82 +95,115 @@ const CheckoutPage = () => {
         }
 
         const user = JSON.parse(userData);
-        // Pre-fill customer info from user data
-        setCustomerInfo({
-          firstName: user.firstName || user.name?.split(' ')[0] || '',
-          lastName: user.lastName || user.name?.split(' ')[1] || '',
-          email: user.email || '',
-          phone: user.phone || '',
-        });
+        
+        if (mounted) {
+          // Pre-fill customer info from user data
+          setCustomerInfo({
+            firstName: user.firstName || user.name?.split(' ')[0] || '',
+            lastName: user.lastName || user.name?.split(' ')[1] || '',
+            email: user.email || '',
+            phone: user.phone || '',
+          });
+        }
 
         const sessionId = getSessionId();
         console.log('🛒 Loading cart for checkout with sessionId:', sessionId);
         
-        const response = await cartAPI.getCart(undefined, sessionId) as any;
-        console.log('🛒 Checkout cart response:', response);
+        // Load cart and tax configuration in parallel
+        const [cartResponse, taxResponse] = await Promise.allSettled([
+          cartAPI.getCart(undefined, sessionId),
+          taxAPI.getTaxConfiguration()
+        ]);
         
-        if (response?.success && response.data) {
-          if (response.data.items && response.data.items.length > 0) {
-            setCart(response.data);
-            
-            // Log checkout started
-            logCartAction('checkout_started', {
-              itemCount: response.data.totalItems || 0,
-              total: response.data.totalAmount || 0,
-              items: response.data.items?.map((item: any) => ({
-                productId: item.product._id,
-                productName: item.product.name,
-                quantity: item.quantity,
-                price: item.price
-              })) || [],
-              customerEmail: user.email,
-              customerId: user._id || user.id
-            });
+        // Handle cart response
+        if (cartResponse.status === 'fulfilled') {
+          const response = cartResponse.value as any;
+          console.log('🛒 Checkout cart response:', response);
+          
+          if (response?.success && response.data) {
+            if (response.data.items && response.data.items.length > 0) {
+              if (mounted) {
+                setCart(response.data);
+                
+                // Log checkout started
+                logCartAction('checkout_started', {
+                  itemCount: response.data.totalItems || 0,
+                  total: response.data.totalAmount || 0,
+                  items: response.data.items?.map((item: any) => ({
+                    productId: item.product._id,
+                    productName: item.product.name,
+                    quantity: item.quantity,
+                    price: item.price
+                  })) || [],
+                  customerEmail: user.email,
+                  customerId: user._id || user.id
+                });
+              }
+            } else {
+              // Redirect to cart if empty
+              navigate('/cart');
+              return;
+            }
           } else {
-            // Redirect to cart if empty
+            // Redirect to cart if no cart found
             navigate('/cart');
+            return;
           }
         } else {
-          // Redirect to cart if no cart found
+          console.error('❌ Error loading cart:', cartResponse.reason);
           navigate('/cart');
+          return;
         }
-      } catch (error) {
-        console.error('❌ Error loading cart for checkout:', error);
-        navigate('/cart');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    const loadTaxConfiguration = async () => {
-      try {
-        console.log('💰 Loading tax configuration from POS system');
-        const response = await taxAPI.getTaxConfiguration() as any;
-        console.log('💰 Tax configuration response:', response);
         
-        if (response?.success && response.data?.taxSettings) {
-          const taxSettings = response.data.taxSettings;
+        // Handle tax configuration response
+        if (taxResponse.status === 'fulfilled' && mounted) {
+          const response = taxResponse.value as any;
+          console.log('💰 Tax configuration response:', response);
+          
+          if (response?.success && response.data?.taxSettings) {
+            const taxSettings = response.data.taxSettings;
+            setTaxConfig({
+              enabled: taxSettings.rate > 0,
+              rate: taxSettings.rate,
+              type: taxSettings.type || 'percentage',
+              name: taxSettings.name || 'Tax'
+            });
+          } else {
+            // Use default tax configuration
+            setTaxConfig({
+              enabled: true,
+              rate: 0.08, // Default 8% tax
+              type: 'percentage',
+              name: 'Tax'
+            });
+          }
+        } else if (mounted) {
+          console.error('❌ Error loading tax configuration:', taxResponse.status === 'rejected' ? taxResponse.reason : 'Unknown error');
+          // Use default tax configuration on error
           setTaxConfig({
-            enabled: taxSettings.rate > 0,
-            rate: taxSettings.rate,
-            type: taxSettings.type || 'percentage',
-            name: taxSettings.name || 'Tax'
+            enabled: true,
+            rate: 0.08, // Default 8% tax
+            type: 'percentage',
+            name: 'Tax'
           });
         }
+        
       } catch (error) {
-        console.error('❌ Error loading tax configuration:', error);
-        // Use default tax configuration on error
-        setTaxConfig({
-          enabled: true,
-          rate: 0.08, // Default 8% tax
-          type: 'percentage',
-          name: 'Tax'
-        });
+        console.error('❌ Error in checkout initialization:', error);
+        navigate('/cart');
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     };
 
-    loadCart();
-    loadTaxConfiguration();
+    loadInitialData();
+    
+    // Cleanup function to prevent state updates on unmounted component
+    return () => {
+      mounted = false;
+    };
   }, [navigate, logCartAction]);
   
   // Form state
@@ -292,7 +327,21 @@ const CheckoutPage = () => {
   // Process Paystack Payment
   const processPayment = () => {
     return new Promise<{ success: boolean; reference?: string }>((resolve) => {
+      // Prevent multiple simultaneous payment attempts
+      if (paymentStatus === 'processing') {
+        console.log('⚠️ Payment already in progress, ignoring duplicate request');
+        resolve({ success: false });
+        return;
+      }
+      
       setPaymentStatus('processing');
+      
+      // Set a timeout to prevent infinite loading
+      const paymentTimeout = setTimeout(() => {
+        console.log('⏰ Payment timeout reached');
+        setPaymentStatus('failed');
+        resolve({ success: false });
+      }, 300000); // 5 minutes timeout
       
       // Log payment attempt
       logAuditEvent({
@@ -317,6 +366,7 @@ const CheckoutPage = () => {
       if (!window.PaystackPop) {
         console.error('❌ Paystack not loaded');
         setPaymentStatus('failed');
+        clearTimeout(paymentTimeout);
         
         // Log payment failure
         logAuditEvent({
@@ -393,6 +443,7 @@ const CheckoutPage = () => {
           order_total: total
         },
         callback: function(response: any) {
+          clearTimeout(paymentTimeout);
           console.log('✅ Payment successful! Response:', response);
           console.log('📋 Transaction Reference:', response.reference);
           
@@ -467,6 +518,7 @@ const CheckoutPage = () => {
             });
         },
         onClose: function() {
+          clearTimeout(paymentTimeout);
           console.log('❌ Payment window closed by user');
           setPaymentStatus('pending'); // Reset to pending, not failed
           
