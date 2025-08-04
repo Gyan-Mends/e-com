@@ -43,7 +43,8 @@ import {
   CheckCircle,
   Truck,
   Calendar,
-  Hash
+  Hash,
+  X
 } from "lucide-react";
 import { 
   cartAPI,
@@ -54,7 +55,7 @@ import {
   formatPrice,
   getSessionId 
 } from "../utils/api";
-import { config, getApiUrl, devLog } from "../utils/config";
+import { config, getApiUrl } from "../utils/config";
 import { useAuditLogger } from "../hooks/useAuditLogger";
 
 const CheckoutPage = () => {
@@ -68,6 +69,8 @@ const CheckoutPage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderId, setOrderId] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [taxConfig, setTaxConfig] = useState<{
     enabled: boolean;
     rate: number;
@@ -109,10 +112,16 @@ const CheckoutPage = () => {
         const sessionId = getSessionId();
         console.log('🛒 Loading cart for checkout with sessionId:', sessionId);
         
-        // Load cart and tax configuration in parallel
+        // Load cart and tax configuration in parallel with better error handling
         const [cartResponse, taxResponse] = await Promise.allSettled([
-          cartAPI.getCart(undefined, sessionId),
-          taxAPI.getTaxConfiguration()
+          cartAPI.getCart(undefined, sessionId).catch(error => {
+            console.error('❌ Cart API error:', error);
+            return { success: false, data: null, message: error.message || 'Failed to load cart' };
+          }),
+          taxAPI.getTaxConfiguration().catch(error => {
+            console.error('❌ Tax API error:', error);
+            return { success: false, data: null, message: error.message || 'Failed to load tax configuration' };
+          })
         ]);
         
         // Handle cart response
@@ -141,18 +150,24 @@ const CheckoutPage = () => {
               }
             } else {
               // Redirect to cart if empty
+              console.log('🛒 Cart is empty, redirecting to cart page');
               navigate('/cart');
               return;
             }
           } else {
             // Redirect to cart if no cart found
+            console.log('🛒 No cart found, redirecting to cart page');
             navigate('/cart');
             return;
           }
         } else {
           console.error('❌ Error loading cart:', cartResponse.reason);
-          navigate('/cart');
-          return;
+          // Instead of redirecting, show error and allow retry
+          if (mounted) {
+            setCart(null);
+            setError('Failed to load cart data. Please try again.');
+            // Don't redirect, let the user see the error
+          }
         }
         
         // Handle tax configuration response
@@ -170,6 +185,7 @@ const CheckoutPage = () => {
             });
           } else {
             // Use default tax configuration
+            console.log('💰 Using default tax configuration');
             setTaxConfig({
               enabled: true,
               rate: 0.08, // Default 8% tax
@@ -190,7 +206,11 @@ const CheckoutPage = () => {
         
       } catch (error) {
         console.error('❌ Error in checkout initialization:', error);
-        navigate('/cart');
+        // Don't redirect on error, let the user see the error
+        if (mounted) {
+          setCart(null);
+          setError('Failed to initialize checkout. Please try again.');
+        }
       } finally {
         if (mounted) {
           setIsLoading(false);
@@ -204,7 +224,14 @@ const CheckoutPage = () => {
     return () => {
       mounted = false;
     };
-  }, [navigate, logCartAction]);
+  }, [navigate, logCartAction, retryCount]);
+  
+  // Retry function
+  const handleRetry = () => {
+    setError(null);
+    setIsLoading(true);
+    setRetryCount(prev => prev + 1);
+  };
   
   // Form state
   const [customerInfo, setCustomerInfo] = useState({
@@ -288,7 +315,7 @@ const CheckoutPage = () => {
       
       // Call POS backend API for verification
       const apiUrl = getApiUrl(config.endpoints.paystack);
-      devLog('Making API call to:', apiUrl);
+      console.log('Making API call to:', apiUrl);
       
       const sessionId = getSessionId();
       const response = await fetch(apiUrl, {
@@ -638,8 +665,10 @@ const CheckoutPage = () => {
       case 1:
         return customerInfo.firstName && customerInfo.lastName && customerInfo.email && customerInfo.phone;
       case 2:
-        return shippingAddress.address && shippingAddress.city && shippingAddress.state && shippingAddress.zipCode;
+        return shippingAddress.address && shippingAddress.city && shippingAddress.state;
       case 3:
+        return true; // Review step is always valid
+      case 4:
         return true; // Paystack validation will be handled during payment
       default:
         return true;
@@ -684,6 +713,34 @@ const CheckoutPage = () => {
         <div className="text-center">
           <Spinner size="lg" />
           <p className="text-gray-500 dark:text-gray-400 mt-4">Loading checkout...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen customed-dark-bg flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 text-red-500">
+            <X size={64} />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            Failed to Load Checkout
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            {error}
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Button color="primary" onPress={handleRetry}>
+              Try Again
+            </Button>
+            <Link to="/cart">
+              <Button variant="flat">
+                Back to Cart
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -737,8 +794,8 @@ const CheckoutPage = () => {
             {[
               { number: 1, title: 'Customer Info', icon: User },
               { number: 2, title: 'Shipping', icon: Truck },
-              { number: 3, title: 'Payment', icon: CreditCard },
-              { number: 4, title: 'Review', icon: CheckCircle },
+              { number: 3, title: 'Review', icon: CheckCircle },
+              { number: 4, title: 'Payment', icon: CreditCard },
             ].map((step, index) => (
               <div key={step.number} className="flex items-center">
                 <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
@@ -839,7 +896,7 @@ const CheckoutPage = () => {
                       required
                     />
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <Input
                         label="City"
                         placeholder="City"
@@ -854,27 +911,7 @@ const CheckoutPage = () => {
                         onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
                         required
                       />
-                      <Input
-                        label="ZIP Code"
-                        placeholder="ZIP"
-                        value={shippingAddress.zipCode}
-                        onChange={(e) => setShippingAddress({...shippingAddress, zipCode: e.target.value})}
-                        required
-                      />
                     </div>
-                    
-                    <Select
-                      label="Country"
-                      selectedKeys={[shippingAddress.country]}
-                      onSelectionChange={(keys) => {
-                        const selectedKey = Array.from(keys)[0] as string;
-                        setShippingAddress({...shippingAddress, country: selectedKey});
-                      }}
-                    >
-                      <SelectItem key="US">United States</SelectItem>
-                      <SelectItem key="CA">Canada</SelectItem>
-                      <SelectItem key="MX">Mexico</SelectItem>
-                    </Select>
                     
                     <div className="mt-6">
                       <h3 className="text-lg font-medium mb-4">Shipping Method</h3>
@@ -907,8 +944,61 @@ const CheckoutPage = () => {
                   </div>
                 )}
 
-                {/* Step 3: Payment Information */}
+                {/* Step 3: Order Review */}
                 {currentStep === 3 && (
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 mb-6">
+                      <CheckCircle size={24} className="text-primary" />
+                      <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                        Review Your Order
+                      </h2>
+                    </div>
+                    
+                    {/* Order Summary */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium">Order Items</h3>
+                      {cart.items.map((item) => (
+                        <div key={item.product._id} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <div className="flex-shrink-0">
+                            {getProductIllustration(item.product)}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-medium">{item.product.name}</h4>
+                            <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">{formatPrice(item.price)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <Divider />
+                    
+                    {/* Customer Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h3 className="text-lg font-medium mb-2">Customer Information</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {customerInfo.firstName} {customerInfo.lastName}<br />
+                          {customerInfo.email}<br />
+                          {customerInfo.phone}
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <h3 className="text-lg font-medium mb-2">Shipping Address</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {shippingAddress.address}<br />
+                          {shippingAddress.city}, {shippingAddress.state}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4: Payment Information */}
+                {currentStep === 4 && (
                   <div className="space-y-6">
                     <div className="flex items-center gap-2 mb-6">
                       <CreditCard size={24} className="text-primary" />
@@ -1034,7 +1124,7 @@ const CheckoutPage = () => {
                             value={billingAddress.address}
                             onChange={(e) => setBillingAddress({...billingAddress, address: e.target.value})}
                           />
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Input
                               label="City"
                               placeholder="City"
@@ -1047,69 +1137,9 @@ const CheckoutPage = () => {
                               value={billingAddress.state}
                               onChange={(e) => setBillingAddress({...billingAddress, state: e.target.value})}
                             />
-                            <Input
-                              label="ZIP Code"
-                              placeholder="ZIP"
-                              value={billingAddress.zipCode}
-                              onChange={(e) => setBillingAddress({...billingAddress, zipCode: e.target.value})}
-                            />
                           </div>
                         </div>
                       )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 4: Order Review */}
-                {currentStep === 4 && (
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-2 mb-6">
-                      <CheckCircle size={24} className="text-primary" />
-                      <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-                        Review Your Order
-                      </h2>
-                    </div>
-                    
-                    {/* Order Summary */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">Order Items</h3>
-                      {cart.items.map((item) => (
-                        <div key={item.product._id} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                          <div className="flex-shrink-0">
-                            {getProductIllustration(item.product)}
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="font-medium">{item.product.name}</h4>
-                            <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">{formatPrice(item.price)}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <Divider />
-                    
-                    {/* Customer Details */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <h3 className="text-lg font-medium mb-2">Customer Information</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {customerInfo.firstName} {customerInfo.lastName}<br />
-                          {customerInfo.email}<br />
-                          {customerInfo.phone}
-                        </p>
-                      </div>
-                      
-                      <div>
-                        <h3 className="text-lg font-medium mb-2">Shipping Address</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {shippingAddress.address}<br />
-                          {shippingAddress.city}, {shippingAddress.state} {shippingAddress.zipCode}<br />
-                          {shippingAddress.country}
-                        </p>
-                      </div>
                     </div>
                   </div>
                 )}
@@ -1128,13 +1158,21 @@ const CheckoutPage = () => {
                   
                   <div className="ml-auto">
                     {currentStep === 3 ? (
+                      <Button
+                        color="primary"
+                        onPress={handleNext}
+                        disabled={!isStepValid(currentStep)}
+                      >
+                        Proceed to Payment
+                      </Button>
+                    ) : currentStep === 4 ? (
                       <div className="flex gap-3">
                         <Button
                           color="primary"
                           onPress={async () => {
                             const paymentResult = await processPayment();
                             if (paymentResult.success) {
-                              handleNext();
+                              handlePlaceOrder();
                             }
                           }}
                           isLoading={paymentStatus === 'processing'}
@@ -1147,11 +1185,12 @@ const CheckoutPage = () => {
                         {paymentStatus === 'success' && (
                           <Button
                             color="success"
-                            variant="flat"
-                            onPress={handleNext}
-                            startContent={<CheckCircle size={18} />}
+                            size="lg"
+                            onPress={handlePlaceOrder}
+                            isLoading={isProcessing}
+                            startContent={<CheckCircle size={20} />}
                           >
-                            Review Order
+                            {isProcessing ? 'Creating Order...' : 'Confirm Order'}
                           </Button>
                         )}
                       </div>
@@ -1163,18 +1202,7 @@ const CheckoutPage = () => {
                       >
                         Next Step
                       </Button>
-                    ) : (
-                      <Button
-                        color="primary"
-                        size="lg"
-                        onPress={handlePlaceOrder}
-                        isLoading={isProcessing}
-                        disabled={paymentStatus !== 'success'}
-                        startContent={<CheckCircle size={20} />}
-                      >
-                        {isProcessing ? 'Creating Order...' : 'Confirm Order'}
-                      </Button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </CardBody>
